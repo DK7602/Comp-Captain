@@ -1,7 +1,8 @@
 # Comp Captain: the plan
 
-Written 2026-11-22, before any code. **Nothing gets built until the owner's graphics and UI are in** (they are
-making them now). This file is the agreement on what Comp Captain does and the order we build it in.
+Written 2026-11-22, before any code. The owner's art came in the same day and we agreed the decisions in
+"Decisions after the art" below; M0 has started. This file is the agreement on what Comp Captain does and the
+order we build it in.
 
 ## What it is, in one breath
 
@@ -36,7 +37,13 @@ Each take gets a role: **Lead**, **Double**, **Harmony**, **Ad-lib**, **Backing*
 Comp Captain guesses from the track name and how the take lines up with the others; you can always change it.
 
 ### 2. LYRICS: know what's being said
-- Paste lyrics, type them, or open a song from Song Rider Pro, Song Savant or Key Compass.
+Every user can get lyrics in, whatever other software they own:
+- **Paste or type** (from Notes, Google Docs, a text message...). `[Verse 1]`, `[Chorus]` style headings become
+  sections automatically.
+- **Open or drag in a file**: .txt, .docx (Word) or .lrc (karaoke lyric files, which carry their own timings).
+- **Hear it**: no lyrics written down? Comp Captain writes them from your takes with the same speech recognition
+  it already uses for scoring, and you fix any wrong words.
+- **Extras** for owners of the other plug-ins: open a song from Song Rider Pro, Song Savant or Key Compass.
 - Comp Captain lines each lyric line up with the audio by itself (speech recognition run on your computer, nothing
   sent anywhere). You can drag a line's start or end if it's off.
 - No lyrics? It still works: it splits the takes into phrases at the gaps and breaths, and names them "Phrase 1, 2..."
@@ -44,18 +51,19 @@ Comp Captain guesses from the track name and how the take lines up with the othe
   you're on lit, plus a count-in to your punch.
 
 ### 3. SCORES: every line of every take gets a score
-Five scores per line, each 0 to 100, each with a plain-words reason (like Voxology's Learn panel):
+Four scores per line, each 0 to 100, each with a plain-words reason (like Voxology's Learn panel), plus a warning
+badge for recording problems:
 
 | Score | What it listens for |
 | --- | --- |
 | **Pitch** | On the notes: against the song's key and against what most of your takes sing there (the "agreed melody"). Off for rap by default. |
 | **Timing** | On the beat: word starts against the grid and against the other takes. Rushed or dragging lines get called out. |
-| **Words** | Clear and right: did the speech recognition hear the lyric? Catches flubbed, swallowed and missing words. |
+| **Clarity** | Clear and right: did the speech recognition hear the lyric? Catches flubbed, swallowed and missing words. |
 | **Energy** | Delivery: loudness, brightness and push compared with your other takes of that line. |
-| **Clean** | Problems in the recording: clipping, pops, mic bumps, a loud breath, room noise, something in the background. |
+| **⚠ badge** | Problems in the recording: clipping, pops, mic bumps, a loud breath, room noise, something in the background. It lowers the total and says what it heard. |
 
 A **Style** sets how much each score counts (Rap, Trap, Singing, Pop, Country, Rock, Worship / Gospel, R&B, or your
-own). Rap leans on Timing, Words and Energy; singing styles lean on Pitch. The total is shown as a star rating.
+own). Rap leans on Timing, Clarity and Energy; singing styles lean on Pitch. The total is shown as a percentage.
 
 The scores advise; you decide. A take you mark as a favourite (heart) wins ties.
 
@@ -89,8 +97,17 @@ The scores advise; you decide. A take you mark as a favourite (heart) wins ties.
 
 - **Song Rider Pro / Song Savant / Key Compass**: lyrics, sections, tempo and key come from their song files.
 - **Voxology**: each rendered file carries its role, so Voxology's Auto-Edit knows a double from a lead (a double
-  gets less reverb, an ad-lib gets its own space). Comp Captain does no processing that's Voxology's job.
+  gets less reverb, an ad-lib gets its own space). Comp Captain does no processing that's Voxology's job (no EQ,
+  tone or pitch smoothing).
 - **Mixology**: roles for Analyze Mix (lead vox, ad-libs, backing).
+- **Comp Captain works fully on its own.** Export (Drag to DAW, Render All) is the same for everyone. The Send
+  buttons depend on what's there:
+  - Voxology / Mixology open in the same project: **Send to Voxology / Mixology** with a green "connected" dot;
+    roles and lyrics go straight over.
+  - Installed but not in this project: the button shows; clicking it says, in plain words, to put Voxology on the
+    lead track and click again.
+  - Not installed: the buttons are hidden and that spot shows **Drag to DAW** and **Render All**. No greyed-out
+    buttons, no ads; one line in the manual and the ⚙ menu says it works even better with the Sonicology suite.
 - **Sonicology Rack**: later, if wanted, Comp Captain shows there too. It is not part of the suite, it works alone.
 
 ## Staying light in an 80-track session
@@ -112,11 +129,49 @@ The scores advise; you decide. A take you mark as a favourite (heart) wins ties.
   - whisper.cpp (MIT) with a small English model (MIT weights) for the lyrics and the Words score.
   - Signalsmith Stretch (MIT), already used by Groove Grabber, for the tightening.
   - ARA SDK (Apache 2.0), JUCE (AGPLv3 / commercial), Catch2 (BSL-1.0).
-- Interface: decided when the owner's art is in. Either the web-view interface (HTML / CSS / JS, like Voxology,
-  Mixology and Masterology) or drawn in JUCE (like Groove Grabber and Song Savant). The web view usually matches
-  painted mockups more closely.
+- Interface: **web view** (HTML / CSS / JS, like Voxology, Mixology and Masterology), chosen 2026-11-22. JUCE 8's
+  WebBrowserComponent uses WebView2 on Windows and WKWebView on Mac, so it works in any DAW that loads VST3 / AU.
+  The UI files are packed inside the plug-in; nothing is loaded from the internet.
 - A light and a dark look, switched by clicking the logo, like the others.
 - An in-app manual in plain words, kept up to date with every version.
+
+## Decisions after the art (2026-11-22)
+
+The owner's art (four mockups, dark and light backgrounds, logo, title, Assistant badge) lives in `art/`. The owner
+said: keep the title, logo, detail, glows and background exactly; button placement and layout are ours to choose.
+
+**Layout.** Header: logo (click = light / dark), title, "Your Comping Captain" script, ⚙ and ? only. Left: six
+pages in workflow order. Top: the track picker and audition transport, then the current lyric line and the
+sections strip (always shown). Right: a panel that changes with the page. Bottom: the Assistant bar (always shown)
+and one big gold button for the page's main job.
+
+| Page | Centre | Right panel | Gold button |
+| --- | --- | --- | --- |
+| **Record** | Teleprompter (karaoke lyrics, bar ruler, live waveform), take picker, arm / meter | Takes, Sections | (none; Cubase records) |
+| **Lyrics** | Lyric editor with sections, load / paste / Hear it, line-up view | Sources, Sections | Line Up Lyrics |
+| **Comp** | Line view (every take of one line, with scores) or Song view (every take across the song), Best Comp lane | Scores for the current line | Build Performance |
+| **Tighten** | Layer lanes against the lead, before / after | Alignment & Layers (Doubles / Ad-Libs / BV / Guitars), Layer Control | Apply & Render |
+| **Review** | Score table for the whole song, flagged lines | Style and weights | Re-score |
+| **Export** | Files to render, Drag to DAW | Send to Voxology / Mixology (if installed) | Render All |
+
+**Changes from the mockups** (owner: "do what's best"):
+1. No "Mix Assist" page and no "pitch smoothing" suggestion: EQ, tone and tuning are Voxology's job. Layer volume
+   lives in Tighten.
+2. Four score columns (Pitch, Timing, Clarity, Energy); recording problems are a ⚠ badge (see Scores).
+3. The red button **arms** CAPTURE. A plug-in can't press Cubase's Record button, so recording starts when you hit
+   Record in Cubase, and each pass becomes a take. "Loop Takes" follows Cubase's cycle. "Pre-roll" is renamed
+   "Count-in on screen" (the real pre-roll is set in Cubase).
+4. No minimize / close buttons (the DAW's window has them). Only ⚙ and ?.
+5. One transport per page (the Record page keeps the big bottom row only).
+6. Best Comp appears once, and each piece sits under the lyric line it belongs to.
+7. Doubles and ad-libs on other tracks: put Comp Captain on each vocal track; the copies in one project find each
+   other, and any window shows them all (the track picker at the top).
+8. The window is resizable and keeps its 16:9 shape (art size 1672 × 941).
+
+**Art handling.** Backgrounds are the owner's plates (1672 × 941); the thin bright lines are redrawn on top so they
+stay sharp on high-resolution screens. The sound-wave glow behind the logo and the compass rose are drawn in code
+(crisp at any size, both looks). The logo's stray glow bits are erased. In the light look the tagline and the word
+"Assistant" get a soft navy shadow so they read on white; panels become frosted white glass with gold edges.
 
 ## Milestones (each one ends with a test in Cubase)
 
@@ -149,7 +204,8 @@ Role tags for Voxology and Mixology, Word swap, the video tutorial, the DAW guid
 
 ## What we need from the owner
 
-- **The graphics and UI** (in progress). Then: web view or drawn in JUCE (see above).
+- ~~The graphics and UI~~ (in, 2026-11-22). ~~Web view or drawn in JUCE~~ (web view).
+- Optional: a cleaner, larger "Your Comping Captain" script as a transparent PNG (for now it's cut from a mockup).
 - **Test sessions**: a few real vocal sessions, ideally 5+ takes of the same verse, a double or two and some ad-libs,
   across genres (a rap verse, a sung hook, a country or rock part, doubled guitars if possible). They're for testing
   only and never go in the repo.

@@ -4,13 +4,12 @@ Comp Captain is a planned JUCE 8 plug-in and standalone app (VST3, Standalone, A
 line of every vocal take, builds the best comp from them, and tightens doubles, stacks, ad-libs, backing vocals and
 doubled guitars to the lead. **The plan is `docs/PLAN.md`: read it first.**
 
-## Status: planning only
+## Status: M0 (the look)
 
-- **Do not write code or start building.** The owner is making the graphics and UI. Building starts (M0) when they
-  share the art and say go.
-- When they share art: look at it carefully, list anything unclear or inconsistent, and settle the interface
-  technology with them (web view like Voxology / Mixology / Masterology, or drawn in JUCE like Groove Grabber /
-  Song Savant) before M0.
+- The owner's art is in `art/` and they said go on 2026-11-22. Decisions are in `docs/PLAN.md`, "Decisions after
+  the art". Interface: **web view** (`ui/`), packed into the plug-in.
+- Keep the title, logo, glows and backgrounds exactly as the owner's art; layout and button placement are ours.
+- Work milestone by milestone; each ends with a test in Cubase by the owner.
 
 ## About the owner
 
