@@ -266,6 +266,10 @@ Pass: on the owner's real takes, lines land within a word of where they belong.
   Compass (`.kcsong`) songs are XML with chords, BPM, key and section names but no words, so they can't fill lyrics
   (their BPM / key / sections could feed the Record page later). Chord sheets in general: chord rows and `[G]`
   inline chords are left out; Song Rider Pro's `__________VERSE 1` break lines are headings.
+- 0.3.1 (owner: "recorded a take, the lyrics aren't following"): the teleprompter now says why it can't follow yet
+  (listening %, waiting for the recording to stop, take didn't match the lyrics, speech problem); Settings has a
+  "Lyrics & listening" report to copy (model path, AVX2, listening state, every take's heard words and lines found);
+  listening no longer waits forever if the DAW stops sending audio blocks right after a recording.
 - Not yet: ARA takes aren't listened to yet (their audio comes through the ARA reader: later);
   dragging a line's ends by hand (M3/M4, with comping).
 

@@ -174,6 +174,7 @@ bool CompCaptainProcessor::isBusesLayoutSupported (const BusesLayout& layouts) c
 void CompCaptainProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     const juce::ScopedNoDenormals noDenormals;
+    blocksPlayed.fetch_add (1, std::memory_order_relaxed);
     const int ins = getTotalNumInputChannels();
     const int n = buffer.getNumSamples();
 
@@ -879,8 +880,12 @@ void CompCaptainProcessor::timerCallback()
         updateCaptureDestination();
     scheduleOverviews();
 
-    // listening waits while a take is being recorded
-    const bool capturing = feed.isCapturing();
+    // Listening waits while a take is being recorded. If the DAW stops sending audio (Cubase can pause
+    // plug-ins on a quiet track), the recording is over even though no block came to say so.
+    const auto blocks = blocksPlayed.load (std::memory_order_relaxed);
+    quietTicks = blocks == blocksSeen ? quietTicks + 1 : 0;
+    blocksSeen = blocks;
+    const bool capturing = feed.isCapturing() && quietTicks < 10;
     if (capturing != wasCapturing)
     {
         listening->recording (capturing);

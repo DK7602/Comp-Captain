@@ -226,6 +226,9 @@ private:
     std::map<std::uint32_t, TakeHearing> hearings;   // under stateLock
     std::atomic<juce::uint32> heardChanged { 1 };
     bool wasCapturing = false;
+    std::atomic<juce::uint32> blocksPlayed { 0 };     // counted by the audio thread
+    juce::uint32 blocksSeen = 0;
+    int quietTicks = 0;                               // timer ticks with no audio blocks
 
     // transport, written by the audio thread
     std::atomic<bool> tKnown { false }, tPlaying { false }, tRecording { false };

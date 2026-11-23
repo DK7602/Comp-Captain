@@ -127,11 +127,26 @@ const Song = (() => {
     return st.heardTakes ? 'Not heard in any take yet' : 'Lines get their times once a take is listened to';
   }
 
+  // Why the words can't follow the song yet (inside the plug-in), in plain words; '' when they can.
+  function notReady() {
+    if (!Bridge.inHost || st.lines.some(timed)) return '';
+    const L = st.listening;
+    if (!st.lines.length) return '';
+    if (L.problem) return L.problem;
+    if (L.now) return `Listening to ${L.now}\u2026 ${L.percent}%. The words follow your song when it\u2019s done.`;
+    if (L.paused) return 'Listening starts as soon as the recording stops.';
+    if (!st.sungTakes) return 'Record a take: once it has been listened to, the words follow your song.';
+    if (L.waiting || st.heardTakes < st.sungTakes) return 'Waiting to listen to your takes\u2026';
+    if (!st.linedUp) return 'Your takes didn\u2019t seem to sing these lyrics. Check the words on the Lyrics page (\u2699 Settings has a report to send).';
+    return '';
+  }
+
   // Asking the plug-in for things
   const open = (from) => Bridge.send('lyricsOpen', from ? { from } : {});
   const sendFile = (name, b64) => Bridge.send('lyricsFile', { name, data: b64 });
   const hearIt = (id) => Bridge.send('hearIt', id ? { id } : {});
   const listenAgain = () => Bridge.send('listenAgain', {});
+  const askReport = (copy) => Bridge.send(copy ? 'copyListenReport' : 'getListenReport', {});
 
-  return { st, onChange, setText, sentLast, shownWords, timed, lineAt, sectionOf, span, whereFrom, open, sendFile, hearIt, listenAgain };
+  return { st, onChange, setText, sentLast, shownWords, timed, lineAt, sectionOf, span, whereFrom, open, sendFile, hearIt, listenAgain, askReport, notReady };
 })();

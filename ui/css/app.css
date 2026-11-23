@@ -699,3 +699,4 @@ svg { display: block; }
 .heard-dot.done { background: #4cf08f; box-shadow: 0 0 4px #4cf08f; }
 .heard-dot.waiting { background: #4fb4ff; animation: cc-pulse 1.2s ease-in-out infinite; }
 .heard-dot.failed { background: #ffb020; }
+.p-line .p-note { display: inline-block; max-width: 92%; white-space: normal; font-size: 24px; line-height: 1.3; font-style: normal; font-weight: 600; color: var(--gold-text); text-shadow: none; vertical-align: middle; }

@@ -52,6 +52,7 @@ private:
     void openLyricsFile (bool songRider);
     void lyricsFromFile (const juce::String& name, const juce::MemoryBlock& bytes);
     void hearIt (const juce::var& message);
+    juce::String listeningReport();
 
     // adding files
     void chooseFiles();

@@ -173,6 +173,25 @@ const { chromium } = require('playwright');
   await p.waitForTimeout(50);
   check((await p.textContent('#lyr-status')).includes('Listening to Take 3 (Lead Vox)\u2026 40%'), 'Lyrics Status shows the take being listened to');
 
+  // before any take is lined up, the teleprompter says why the words don't follow yet
+  await p.click('.nav-btn[data-go="record"]');
+  await send({ type: 'lyrics', text: lyricsText, linedUp: 0, sungTakes: 1, heardTakes: 0,
+    sections: [{ name: 'Verse 1', first: 0, count: 2 }, { name: 'Chorus', first: 2, count: 1 }],
+    lines: [line('I was lost in the dark', 0, -1, -1, { takes: 0 }), line('but You found me', 0, -1, -1, { takes: 0 }), line('I\'m alive, I\'m alive', 1, -1, -1, { takes: 0 })] });
+  await p.waitForTimeout(120);
+  check((await p.textContent('#p-prev')).includes('Listening to Take 3 (Lead Vox)'), 'not lined up yet: the teleprompter says the take is being listened to');
+  await send({ type: 'listening', now: '', percent: 0, waiting: 0, paused: false, problem: '' });
+  await send({ type: 'lyrics', text: lyricsText, linedUp: 0, sungTakes: 1, heardTakes: 1,
+    sections: [{ name: 'Verse 1', first: 0, count: 2 }, { name: 'Chorus', first: 2, count: 1 }],
+    lines: [line('I was lost in the dark', 0, -1, -1, { takes: 0 }), line('but You found me', 0, -1, -1, { takes: 0 }), line('I\'m alive, I\'m alive', 1, -1, -1, { takes: 0 })] });
+  await p.waitForTimeout(120);
+  check((await p.textContent('#p-prev')).includes('didn\u2019t seem to sing these lyrics'), 'and says so when the take didn\'t sing these lyrics');
+  await p.click('#btn-settings');
+  await p.click('#set-lcopy');
+  out = await sent();
+  check(out.some((m) => m.type === 'copyListenReport'), 'Settings can copy the lyrics and listening report');
+  await p.click('#settings [data-close]');
+
   // the teleprompter follows the DAW
   await send({ type: 'lyrics', text: lyricsText, linedUp: 2, sungTakes: 2, heardTakes: 2,
     sections: [{ name: 'Verse 1', first: 0, count: 2 }, { name: 'Chorus', first: 2, count: 1 }],

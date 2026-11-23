@@ -40,7 +40,7 @@
     align: JSON.parse(JSON.stringify(D.alignDefaults)),
     exportOn: {},
     sonicology: { voxology: 'installed', mixology: 'installed' },
-    version: '0.3.0', host: 'Browser preview',
+    version: '0.3.1', host: 'Browser preview',
     level: 0,
   };
   if (!PAGES.includes(S.page)) S.page = 'comp';
@@ -444,8 +444,9 @@
     const l = ls[cur];
     const words = (x, live) => (!x ? '' : x.shown.map((w, i) => (live && SG.timed(x) && x.words[i] && t >= x.words[i][0] && t >= x.start - 0.05 ? `<span class="sung">${escapeHtml(w)}</span>` : escapeHtml(w))).join(' '));
     const count = countIn(cur, t);
-    $('#p-prev').innerHTML = count || words(ls[cur - 1], false);
-    $('#p-prev').classList.toggle('counting', !!count);
+    const why = SG.notReady();
+    $('#p-prev').innerHTML = why ? `<span class="p-note">${escapeHtml(why)}</span>` : (count || words(ls[cur - 1], false));
+    $('#p-prev').classList.toggle('counting', !!count && !why);
     $('#p-now').innerHTML = l ? words(l, S.following || !Bridge.inHost) : `<span class="dim">${SS.text.trim() ? '' : 'Your lyrics show here'}</span>`;
     $('#p-next').innerHTML = l ? words(ls[cur + 1], false) : `<span class="dim">${SS.text.trim() ? '' : 'Add them on the Lyrics page'}</span>`;
     fitPrompter();
@@ -860,6 +861,7 @@
       <div class="set-row"><div>Loop Takes<small>Each time your DAW's loop comes round, a new take (off: only the first pass)</small></div><div class="seg" id="set-loop"><button data-v="1">On</button><button data-v="0">Off</button></div></div>
       <div class="set-row"><div>ARA (Cubase Extension)<small>What your DAW shared with Comp Captain, to send back if something looks wrong</small></div><div class="btn-row"><button class="pill" id="set-report">Show</button><button class="pill" id="set-copy">Copy</button></div></div>
       <pre class="report" id="set-report-text" hidden></pre>
+      <div class="set-row"><div>Lyrics &amp; listening<small>What Comp Captain heard in your takes and where each line landed, to send back if the words don't follow</small></div><div class="btn-row"><button class="pill" id="set-lreport">Show</button><button class="pill" id="set-lcopy">Copy</button></div></div>
       <div class="set-row"><div>Background listening<small>Uses at most half your computer's cores, never the audio thread</small></div><span class="gold">On</span></div>
       <div class="set-row"><div>Voxology<small>${st('voxology')}</small></div><span class="dot ${S.sonicology.voxology === 'linked' ? 'on' : ''}"></span></div>
       <div class="set-row"><div>Mixology<small>${st('mixology')}</small></div><span class="dot ${S.sonicology.mixology === 'linked' ? 'on' : ''}"></span></div>
@@ -871,6 +873,8 @@
     $$('#set-loop button').forEach((b) => { b.classList.toggle('on', (b.dataset.v === '1') === TS.capture.loopTakes); b.onclick = () => { T.setLoopTakes(b.dataset.v === '1'); setTimeout(renderSettings, 150); }; });
     $('#set-report').onclick = () => T.askReport(false);
     $('#set-copy').onclick = () => T.askReport(true);
+    $('#set-lreport').onclick = () => (Bridge.inHost ? SG.askReport(false) : toast('In the plug-in this shows what was heard in your takes.'));
+    $('#set-lcopy').onclick = () => (Bridge.inHost ? SG.askReport(true) : toast('In the plug-in this copies what was heard in your takes.'));
     if (TS.report) { $('#set-report-text').hidden = false; $('#set-report-text').textContent = TS.report; }
   }
 
@@ -1058,7 +1062,7 @@
   });
   let lyricsQueued = false;
   SG.onChange((what) => {
-    if (what === 'listening') { if (S.page === 'lyrics') { renderLyricsStatus(); renderFooter(); } return; }
+    if (what === 'listening') { if (S.page === 'lyrics') { renderLyricsStatus(); renderFooter(); } if (S.page === 'record') renderPrompter(); return; }
     if (lyricsQueued) return; lyricsQueued = true;
     requestAnimationFrame(() => {
       lyricsQueued = false;

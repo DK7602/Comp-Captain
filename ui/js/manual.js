@@ -123,7 +123,10 @@ line before and the next line sit above and below. The section box and the lyric
 along. With <b>Count-in on screen</b> on (bottom of the Record page), the beats before a line count down as glowing
 dots. When your DAW is stopped, it shows the line where the playhead is; the arrows step through the sections.</p>
 <p>The teleprompter follows once a take has been listened to (that's how it knows where the lines are). For a brand
-new song, record a first take, and from the second take on the words follow you.</p>
+new song, record a first take, and from the second take on the words follow you. Until then, the space above the big
+line says what it's waiting for (for example "Listening to Take 1... 40%").</p>
+<p>Words not following? Open <b>&#x2699; Settings</b> and click <b>Copy</b> next to <b>Lyrics &amp; listening</b>: it
+copies a plain report of what Comp Captain heard in your takes and where each line landed. Paste it into the chat.</p>
 
 <h2>The scores (M3)</h2>
 <ul>

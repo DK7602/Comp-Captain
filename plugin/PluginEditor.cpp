@@ -245,6 +245,16 @@ void CompCaptainEditor::handleUiEvent (const juce::var& message)
         withViewed ([] (CompCaptainProcessor& p) { p.listenAgain(); });
         sendListening (true);
     }
+    else if (type == "getListenReport" || type == "copyListenReport")
+    {
+        const auto text = listeningReport();
+        if (type == "copyListenReport")
+            juce::SystemClipboard::copyTextToClipboard (text);
+        auto* r = new juce::DynamicObject();
+        r->setProperty ("text", text);
+        r->setProperty ("copied", type == "copyListenReport");
+        send ("report", r);
+    }
     else if (type == "getReport" || type == "copyReport")
     {
         juce::String text;
@@ -732,6 +742,81 @@ void CompCaptainEditor::lyricsFromFile (const juce::String& name, const juce::Me
     }
     send ("lyricsLoaded", msg);
     sendLyrics (false);
+}
+
+// A plain report of the lyrics, the listening and where each line landed, to paste into the chat when the
+// words don't follow the song.
+juce::String CompCaptainEditor::listeningReport()
+{
+    juce::String r;
+    const auto nl = juce::String ("\n");
+    r << "Comp Captain " << JucePlugin_VersionString << ": lyrics and listening report" << nl
+      << "Host: " << hostDescription (processor.wrapperType) << nl;
+
+    const auto model = Listening::findModel();
+    r << "Speech model: " << (model == juce::File() ? juce::String ("NOT FOUND") : model.getFullPathName()) << nl;
+#if JUCE_INTEL
+    r << "Processor: AVX2 " << (juce::SystemStats::hasAVX2() ? "yes" : "NO") << ", FMA " << (juce::SystemStats::hasFMA3() ? "yes" : "NO")
+      << ", " << juce::SystemStats::getNumCpus() << " cores" << nl;
+#endif
+    const auto st = CompCaptainProcessor::listeningStatus();
+    r << "Listening: " << (st.now.isNotEmpty() ? "now " + st.now + " (" + juce::String (st.percent) + "%)" : juce::String ("idle"))
+      << ", waiting " << st.waiting << (st.pausedForRecording ? ", paused while a take records" : "")
+      << (st.problem.isNotEmpty() ? ", PROBLEM: " + st.problem : juce::String()) << nl;
+
+    const auto song = CompCaptainProcessor::song();
+    r << "Lyrics: " << (int) song->lyrics.lines.size() << " lines, " << (int) song->lyrics.sections.size() << " sections";
+    if (! song->lyrics.lines.empty())
+        r << " (first line: \"" << str (song->lyrics.lines.front().text) << "\")";
+    r << nl << "Vocal takes in the song: " << song->sungTakes << ", listened to: " << song->heardTakes << ", lined up: " << song->lineUp.takesLinedUp << nl;
+    int timed = 0;
+    for (auto& l : song->lineUp.lines)
+        timed += l.start >= 0 ? 1 : 0;
+    r << "Lines with a time: " << timed << " of " << (int) song->lineUp.lines.size() << nl;
+
+    const auto t = processor.transport();
+    r << "DAW: " << (t.known ? (t.playing ? "playing" : "stopped") : "position unknown") << " at " << juce::String (t.seconds, 2) << " s (quarter "
+      << juce::String (t.ppq, 2) << "), " << juce::String (t.bpm, 2) << " BPM " << str (t.meter.toText()) << nl;
+
+    withViewed ([&] (CompCaptainProcessor& p) {
+        const auto takes = p.getTakes();
+        r << nl << "Takes on " << (p.trackName().isNotEmpty() ? p.trackName() : juce::String ("this track")) << ": " << (int) takes.size() << nl;
+        for (const auto* tk : takes.inSongOrder())
+        {
+            r << "- " << str (tk->name) << " (" << str (cc::toLabel (tk->role)) << ", " << str (cc::toName (tk->source)) << "): bar "
+              << str (tk->startBarBeat().toText()) << ", starts at " << juce::String (tk->start.seconds, 2) << " s, "
+              << juce::String (tk->lengthSeconds(), 1) << " s long" << nl;
+            const auto state = p.takeHearingState (tk->id);
+            r << "  listened: " << (state.isEmpty() ? juce::String ("not asked") : state);
+            if (const auto h = p.takeHearing (tk->id))
+            {
+                r << ", " << (int) h->words.size() << " words, " << (int) h->phrases.size() << " phrases" << nl << "  heard:";
+                int n = 0;
+                for (auto& w : h->words)
+                {
+                    if (++n > 40)
+                    {
+                        r << " ...";
+                        break;
+                    }
+                    r << str (w.text);
+                }
+            }
+            r << nl;
+            const auto key = (p.instanceId() << 32) | tk->id;
+            if (const auto placed = song->lineUp.takes.find (key); placed != song->lineUp.takes.end())
+            {
+                r << "  lines found: " << (int) placed->second.size();
+                if (! placed->second.empty())
+                    r << " (lines " << placed->second.front().line + 1 << " to " << placed->second.back().line + 1 << ", first at "
+                      << juce::String (tk->start.seconds + placed->second.front().start, 2) << " s in the song)";
+                r << nl;
+            }
+            else if (! song->lyrics.empty() && state == "done")
+                r << "  lines found: none (what was heard didn't match the lyrics)" << nl;
+        }
+    });
+    return r;
 }
 
 void CompCaptainEditor::hearIt (const juce::var& message)
