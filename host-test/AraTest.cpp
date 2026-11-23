@@ -400,6 +400,10 @@ int main (int argc, char** argv)
     // 8. The DAW takes the take away and closes the song: everything shuts down cleanly.
     auto step = [] (const char* what) { std::cout << "        closing: " << what << std::endl; };
     step ("the take leaves the renderer");
+    // Take it out explicitly first: JUCE's host helper (PlaybackRegionRegistry) erases from its
+    // list while walking it when it's destroyed with takes still in it, which crashes on macOS.
+    // That's test-host code, not Comp Captain; a DAW removes its takes before letting go anyway.
+    renderer->remove (*region);
     renderer.reset();
     step ("the take");
     region.reset();
