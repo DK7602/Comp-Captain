@@ -442,11 +442,13 @@ void CompCaptainEditor::sendTransport (bool force)
 
 void CompCaptainEditor::sendCapture (bool force)
 {
-    const auto live = processor.liveTake (liveSerial == 0 ? 0 : liveSent);
+    auto live = processor.liveTake (liveSent);
     if (live.serial != liveSerial)
     {
+        // a new take: its waveform starts from the beginning
         liveSerial = live.serial;
         liveSent = 0;
+        live = processor.liveTake (0);
     }
     const bool armed = processor.isArmed();
     const bool capturing = processor.isCapturing() || live.recording;
