@@ -248,9 +248,9 @@ const Takes = (() => {
     takes.forEach((t) => {
       const row = document.createElement('div');
       row.className = 'tl-row real' + (t.id === st.sel ? ' sel' : '') + (t.missing ? ' missing' : '');
-      row.title = `${t.name}: bar ${t.barText}, ${fmtLen(t.lenSec)} long${t.source === 'file' && t.original ? `\nAdded from ${t.original}` : ''}${t.source === 'ara' ? `\nOn the lanes of "${t.laneTrack || t.track}"${t.here ? ' (played by this Comp Captain)' : ''}` : ''}${t.missing ? '\nThe file is missing: was the takes folder moved?' : ''}`;
+      row.title = `${t.name}: bar ${t.barText}, ${fmtLen(t.lenSec)} long${heardText(t)}${t.source === 'file' && t.original ? `\nAdded from ${t.original}` : ''}${t.source === 'ara' ? `\nOn the lanes of "${t.laneTrack || t.track}"${t.here ? ' (played by this Comp Captain)' : ''}` : ''}${t.missing ? '\nThe file is missing: was the takes folder moved?' : ''}`;
       row.innerHTML = `<span class="play" title="Hear this take (arrives in M4)"><svg viewBox="0 0 24 24"><use href="#i-play"/></svg></span>
-        <span class="nm">${esc(t.name)}</span>
+        <span class="nm">${esc(t.name)}${t.heard ? `<i class="heard-dot ${t.heard}"></i>` : ''}</span>
         <span class="role-chip" style="--rc:${roleColor(t.role)}" title="Role: ${roleLabel(t.role)} (click to change)">${roleLabel(t.role)}</span>
         <span class="at">${t.missing ? '\u26A0 missing' : 'bar ' + esc(t.barText)}</span>
         <span class="fav-btn${t.fav ? ' on' : ''}" title="${t.fav ? 'Favourite (wins ties)' : 'Mark as favourite'}">\u2665</span>
@@ -287,6 +287,12 @@ const Takes = (() => {
     if (sel && st.sel !== scrolledTo) { scrolledTo = st.sel; sel.scrollIntoView({ block: 'nearest' }); }
   }
   let scrolledTo = null;
+  function heardText(t) {
+    if (t.heard === 'done') return `\nListened to: ${t.words || 0} words, ${(t.phrases || []).length} phrases`;
+    if (t.heard === 'waiting') return '\nWaiting to be listened to (for lining up the lyrics)';
+    if (t.heard === 'failed') return '\nCouldn\u2019t be listened to';
+    return '';
+  }
 
   // ------------------------------------------------------------------ Record page: the selected (or recording) take on its bars
   function drawRecord(canvas, barsEl) {
@@ -313,7 +319,8 @@ const Takes = (() => {
   }
 
   // ------------------------------------------------------------------ Comp page, Song view: every take on the song's bars
-  function drawLanes(lanesEl, rulerEl) {
+  // band: [first quarter, last quarter] of the current lyric line, shaded across the lanes (or null).
+  function drawLanes(lanesEl, rulerEl, band) {
     lanesEl.innerHTML = '';
     const live = liveTake();
     const takes = st.list.slice().concat(live ? [live] : []);
@@ -332,9 +339,24 @@ const Takes = (() => {
       lane.innerHTML = `<div class="lane-name"><span class="dot" style="color:${t.live ? '#ff4d4d' : roleColor(t.role)}"></span><span class="ln">${esc(t.name)}</span>${t.fav ? '<span class="fav">\u2665</span>' : ''}<small>${t.live ? 'recording' : roleLabel(t.role)}</small></div><canvas></canvas>${t.live ? '' : '<button class="more" title="More">\u2022\u2022\u2022</button>'}`;
       lanesEl.appendChild(lane);
       Wave.draw(lane.querySelector('canvas'), { t0: q0, t1: q1, env: envFor(t), color: t.live ? '#ff4d4d' : roleColor(t.role), seed: 3, step: 1.6, glow: 5, noise: false });
+      const at = (q) => `calc(200px + (100% - 240px) * ${(q - q0) / (q1 - q0)})`;
+      const wide = (a, b) => `calc((100% - 240px) * ${Math.max(0, b - a) / (q1 - q0)})`;
+      if (band && band[1] > q0 && band[0] < q1) {
+        const a = Math.max(q0, band[0]), b = Math.min(q1, band[1]);
+        const e = document.createElement('div'); e.className = 'line-band'; e.style.left = at(a); e.style.width = wide(a, b); lane.appendChild(e);
+      }
+      // the sung phrases (found by listening), under the waveform
+      if (!t.live && Array.isArray(t.phrases)) {
+        const perSec = (t.bpm || 120) / 60;
+        t.phrases.forEach(([s0, s1]) => {
+          const a = Math.max(q0, t.ppq + s0 * perSec), b = Math.min(q1, t.ppq + s1 * perSec);
+          if (b <= a) return;
+          const e = document.createElement('div'); e.className = 'phrase'; e.style.left = at(a); e.style.width = wide(a, b); lane.appendChild(e);
+        });
+      }
       if (st.transport.known && ph >= q0 && ph <= q1) {
         const p = document.createElement('div'); p.className = 'lane-head';
-        p.style.left = `calc(200px + (100% - 240px) * ${(ph - q0) / (q1 - q0)})`; lane.appendChild(p);
+        p.style.left = at(ph); lane.appendChild(p);
       }
       if (!t.live) {
         lane.onclick = (e) => { if (e.target.closest('.more')) return takeMenu(e.target.closest('.more'), t); select(t.id); };
@@ -421,6 +443,9 @@ const Takes = (() => {
     uploading = false;
   }
   const AUDIO = /\.(wav|wave|aif|aiff|aifc|flac|mp3)$/i;
+  const LYRICS = /\.(txt|text|lrc|docx|doc)$/i;
+  let lyricsDrop = null;
+  const setLyricsDrop = (fn) => { lyricsDrop = fn; };
   function wireDrop(stage, hint) {
     let depth = 0;
     const hasFiles = (e) => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
@@ -432,7 +457,9 @@ const Takes = (() => {
       e.preventDefault(); depth = 0; hint.hidden = true;
       const files = Array.from(e.dataTransfer.files || []);
       const audio = files.filter((f) => AUDIO.test(f.name));
-      if (!audio.length) { toastFn('Comp Captain takes WAV, AIFF, FLAC and MP3 files.', 4000); return; }
+      const lyricFile = files.find((f) => LYRICS.test(f.name));
+      if (!audio.length && lyricFile && lyricsDrop) { lyricsDrop(lyricFile); return; }
+      if (!audio.length) { toastFn('Comp Captain takes WAV, AIFF, FLAC and MP3 files (and lyrics as .txt, .lrc or .docx).', 4000); return; }
       if (uploading) { toastFn('Still bringing in the last files. Try again in a moment.'); return; }
       if (audio.length < files.length) toastFn(`${files.length - audio.length} file${files.length - audio.length > 1 ? 's were' : ' was'} skipped (not WAV, AIFF, FLAC or MP3).`, 4000);
       placementDialog({ dropped: audio, files: audio.map((f) => ({ name: f.name.replace(/\.[^.]+$/, ''), guess: guessRole(f.name) })) });
@@ -516,6 +543,6 @@ const Takes = (() => {
   return {
     st, ROLES, roleLabel, roleColor, onChange, setToast, setMenu,
     setArmed, setLoopTakes, viewTrack, setTrackRole, openFolder, askReport, addFiles, select, selected,
-    renderList, drawRecord, drawLanes, trackMenu, trackLabel, wireDrop, status, playheadPpq, mockStart, fmtLen,
+    renderList, drawRecord, drawLanes, trackMenu, trackLabel, wireDrop, setLyricsDrop, status, playheadPpq, mockStart, fmtLen,
   };
 })();

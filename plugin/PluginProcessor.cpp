@@ -309,6 +309,16 @@ juce::String CompCaptainProcessor::araRoles() const
 
 void CompCaptainProcessor::getStateInformation (juce::MemoryBlock& dest)
 {
+    // The song's lyrics first: the registry's lock is always taken before a copy's own lock (never the
+    // other way round), so saving can't get stuck against the window reading every copy's takes.
+    std::string lyrics;
+    juce::int64 lyricsStamp = 0;
+    {
+        auto& reg = Registry::get();
+        const std::scoped_lock song (reg.lock);
+        lyrics = reg.lyrics;
+        lyricsStamp = reg.lyricsStamp;
+    }
     std::string text;
     {
         const std::scoped_lock lock (stateLock);
@@ -320,13 +330,9 @@ void CompCaptainProcessor::getStateInformation (juce::MemoryBlock& dest)
         text += std::string ("trackRoleChosen=") + (roleOfTrackChosen ? "1" : "0") + "\n";
         text += std::string ("loopTakes=") + (feed.loopTakes() ? "1" : "0") + "\n";
         text += "seed=" + std::to_string (seed) + "\n";
-        {
-            auto& reg = Registry::get();
-            const std::scoped_lock song (reg.lock);
-            text += lyricsMarker;
-            text += "stamp=" + std::to_string (reg.lyricsStamp) + "\n";
-            text += "text=" + cc::text::escape (reg.lyrics) + "\n";
-        }
+        text += lyricsMarker;
+        text += "stamp=" + std::to_string (lyricsStamp) + "\n";
+        text += "text=" + cc::text::escape (lyrics) + "\n";
         text += takesMarker;
         text += takes.toText();
     }

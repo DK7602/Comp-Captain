@@ -7,10 +7,11 @@ const Manual = `
 <p>You sing a part five or ten times. Comp Captain listens to every take, scores every line, and builds one great
 performance from the best lines. You approve every pick. Then it lines up your doubles, ad-libs, backing vocals and
 doubled guitars so they sit tight with the lead, and hands the finished parts back to your DAW.</p>
-<p><b>This version (M1) brings your takes in.</b> Record them with CAPTURE, add audio files, or let Cubase hand over the
-takes on a track's lanes. Every take lands on the bar it belongs to. Lyrics, scores and comping come in the next
-versions: until then those pages show a sample song, marked with a gold <span class="soon">SAMPLE</span> tag.
-On its track, Comp Captain passes your audio through untouched.</p>
+<p><b>This version (M2) brings your takes and your lyrics in.</b> Record takes with CAPTURE, add audio files, or let
+Cubase hand over the takes on a track's lanes. Every take lands on the bar it belongs to. Give Comp Captain your
+lyrics and it listens to each take and works out where every line is sung, so the teleprompter follows your song.
+Scores and comping come in the next versions: until then those parts show a sample song, marked with a gold
+<span class="soon">SAMPLE</span> tag. On its track, Comp Captain passes your audio through untouched.</p>
 
 <h2>Recording takes (CAPTURE)</h2>
 <ol>
@@ -68,8 +69,8 @@ bar (from your project's tempo and time signatures), and plays them back exactly
 
 <h2>The pages (left side)</h2>
 <ul>
-<li><b>Record</b>: CAPTURE, your takes, and the teleprompter (sample lyrics until M2).</li>
-<li><b>Lyrics</b>: get the words in, then Comp Captain lines each line up with the audio. <span class="soon">M2</span></li>
+<li><b>Record</b>: CAPTURE, your takes, and the teleprompter with your lyrics.</li>
+<li><b>Lyrics</b>: get the words in; Comp Captain lines each line up with your takes.</li>
 <li><b>Comp</b>: every take of every line with its scores; the Song view already shows your real takes.
 <span class="soon">M3&#x2013;M4</span></li>
 <li><b>Tighten</b>: line up doubles, ad-libs, backing vocals and guitars with the lead. <span class="soon">M5</span></li>
@@ -77,14 +78,48 @@ bar (from your project's tempo and time signatures), and plays them back exactly
 <li><b>Export</b>: make the finished audio files, or drag them straight into your DAW. <span class="soon">M4</span></li>
 </ul>
 
-<h2>Getting lyrics in (M2)</h2>
+<h2>Getting lyrics in</h2>
 <ul>
-<li><b>Paste</b> or type them. Put <b>[Verse 1]</b>, <b>[Chorus]</b> and so on above each part to make sections.</li>
-<li><b>Open File</b>: a .txt, a Word .docx, or an .lrc karaoke file.</li>
-<li><b>Hear It</b>: no lyrics written down? Comp Captain writes them from your takes, and you fix any wrong words.</li>
-<li><b>From My Songs</b>: if you have Song Rider Pro, Song Savant or Key Compass, open a song from them.</li>
-<li>No lyrics at all is fine too: it splits the takes into phrases at the breaths.</li>
+<li><b>Type or paste</b> them in the box on the <b>Lyrics</b> page. Put <b>[Verse 1]</b>, <b>[Chorus]</b> and so on
+above each part to make sections (Chorus:, (Bridge) and VERSE 2 work too).</li>
+<li>A chorus you sing again: write <b>[Chorus]</b> again with nothing under it, and Comp Captain sings it again.
+<b>[Chorus x2]</b> sings it twice. Notes like (x2) or *repeat* on their own line are skipped.</li>
+<li><b>Open File</b>, or drop the file on the window: a .txt, a Word .docx, or an .lrc karaoke file. Older Word
+files (.doc) and PDFs can't be read: open them and copy the words into the box.</li>
+<li><b>Hear It</b>: no lyrics written down? Comp Captain writes them from your lead take (or the take you picked on the
+Record page). Fix any wrong words, then add the section headings.</li>
+<li>Paste, Open and Hear It replace what's in the box. <b>Undo</b> (top right of the box) brings the old lyrics back.</li>
+<li><b>From My Songs</b> (Song Rider Pro, Song Savant, Key Compass) arrives in a later update.</li>
 </ul>
+<p>The lyrics belong to the song: every Comp Captain in your project shows the same lyrics, and they're saved with the
+project.</p>
+
+<h2>How the lyrics get lined up</h2>
+<p>Comp Captain <b>listens</b> to each vocal take in the background (speech recognition on your computer: nothing is
+sent anywhere) and works out where every line is sung. It does this once per take and keeps what it heard next to the
+take (a small <i>.words</i> file), so opening the project again is instant. It uses at most half your computer's cores,
+never the audio thread, and waits while you record.</p>
+<ul>
+<li>The <b>Lined up with the audio</b> list shows each line with the bar it starts on. A dimmed line wasn't heard in
+any take yet: it's placed between the lines around it. Hover over a line to see which takes sang it.</li>
+<li>Lead takes set the timing. A take that only covers part of the song (a punch-in on the last chorus) lands on the
+right part, by where it sits in your song.</li>
+<li><b>Lyrics Status</b> shows which take is being listened to. A small dot next to each take in the take list shows
+it too: green when it's been listened to.</li>
+<li>Changed the words a lot? Lining up happens again by itself. <b>Listen to the takes again</b> starts over.</li>
+<li>The listening needs a processor from about 2013 or newer. On an older one, lyrics and sections still work, just
+without the lining up.</li>
+</ul>
+<p>No lyrics at all is fine too: each take is still split into its sung <b>phrases</b> (shown as thin blue marks under
+each take in the Comp page's Song view).</p>
+
+<h2>The teleprompter (Record page)</h2>
+<p>While your DAW plays, the line being sung sits big in the middle, the words light up gold as they're sung, and the
+line before and the next line sit above and below. The section box and the lyric strip on the other pages follow
+along. With <b>Count-in on screen</b> on (bottom of the Record page), the beats before a line count down as glowing
+dots. When your DAW is stopped, it shows the line where the playhead is; the arrows step through the sections.</p>
+<p>The teleprompter follows once a take has been listened to (that's how it knows where the lines are). For a brand
+new song, record a first take, and from the second take on the words follow you.</p>
 
 <h2>The scores (M3)</h2>
 <ul>

@@ -60,7 +60,6 @@
 
     <!-- Current lyric line + sections strip (all pages except Record) -->
     <div class="lyricbar">
-      <div class="sample-badge">Sample song &#xB7; your lyrics and sections arrive in M2</div>
       <div class="lyric-line">
         <button class="arrow" id="line-prev" title="Previous line"><svg viewBox="0 0 24 24"><use href="#i-chev-left"/></svg></button>
         <div class="line-text" id="line-text"></div>
@@ -89,7 +88,6 @@
         <button class="pill gold-outline on" id="rec-loop"><svg viewBox="0 0 24 24"><use href="#i-loop"/></svg>Loop</button>
       </div>
       <div class="prompter" id="prompter">
-        <div class="sample-badge" title="The teleprompter shows your own lyrics from M2 (Lyrics). Your takes are real.">Sample lyrics &#xB7; yours arrive in M2</div>
         <div class="p-line prev" id="p-prev"></div>
         <div class="p-line now" id="p-now"></div>
         <div class="p-line next" id="p-next"></div>
@@ -114,7 +112,6 @@
 
     <!-- ===== PAGE: LYRICS ===== -->
     <section class="page" data-page="lyrics">
-      <div class="sample-badge">Sample lyrics &#xB7; lining up your own arrives in M2</div>
       <div class="lyr-tools">
         <button class="tool-btn" id="lyr-paste"><svg viewBox="0 0 24 24"><use href="#i-paste"/></svg><b>Paste</b><small>From anywhere</small></button>
         <button class="tool-btn" id="lyr-open"><svg viewBox="0 0 24 24"><use href="#i-folder"/></svg><b>Open File</b><small>.txt &#xB7; .docx &#xB7; .lrc</small></button>
@@ -123,7 +120,7 @@
       </div>
       <div class="lyr-body">
         <div class="lyr-editor">
-          <div class="box-head"><svg viewBox="0 0 24 24"><use href="#i-lyrics"/></svg>Lyrics <span class="dim">&#x2014; type <b>[Verse 1]</b>, <b>[Chorus]</b>&#x2026; above a part to make sections</span></div>
+          <div class="box-head"><svg viewBox="0 0 24 24"><use href="#i-lyrics"/></svg>Lyrics <span class="dim">&#x2014; type <b>[Verse 1]</b>, <b>[Chorus]</b>&#x2026; above a part to make sections</span><button class="pill small-pill" id="lyr-undo" hidden>Undo</button></div>
           <textarea id="lyr-text" spellcheck="false"></textarea>
         </div>
         <div class="lyr-lines">
@@ -225,11 +222,7 @@
     <div class="side-page" data-page="lyrics">
       <div class="side-box">
         <div class="side-title"><svg viewBox="0 0 24 24"><use href="#i-lyrics"/></svg>Lyrics Status</div>
-        <div class="status-list">
-          <div><i class="ok"></i>12 lines &#xB7; 4 sections</div>
-          <div><i class="ok"></i>Lined up on 5 takes</div>
-          <div><i class="warn"></i>Line 7: check the end (drag it)</div>
-        </div>
+        <div class="status-list" id="lyr-status"></div>
       </div>
       <div class="side-box">
         <div class="side-title"><svg viewBox="0 0 24 24"><use href="#i-list"/></svg>SECTIONS</div>
@@ -394,6 +387,7 @@
 <script src="js/demo.js"></script>
 <script src="js/wave.js"></script>
 <script src="js/takes.js"></script>
+<script src="js/song.js"></script>
 <script src="js/manual.js"></script>
 <script src="js/app.js"></script>
 </body>

@@ -662,3 +662,40 @@ svg { display: block; }
 /* the take picker under the waveform: one line, long names trimmed */
 #rec-take { flex: 1; min-width: 0; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sheet-body ol { margin: 6px 0; padding-left: 24px; color: var(--text-2); }
+
+/* ---------------------------------------------------------------- M2: lyrics */
+.line-text .dim { font-size: 24px; font-weight: 400; color: var(--text-3); text-shadow: none; }
+.p-line .dim { font-size: 34px; font-weight: 500; font-style: normal; color: var(--text-3); text-shadow: none; }
+/* count-in: the beats before a line, where the previous line was */
+.p-line.prev.counting { color: var(--gold-text); }
+.p-line .count { display: inline-flex; align-items: center; gap: 18px; font-style: normal; }
+.p-line .count i { display: inline-block; width: 26px; height: 26px; border-radius: 50%; border: 2px solid rgba(255, 200, 60, .7); }
+.p-line .count i.lit { background: radial-gradient(circle, #ffe58a, #f5a90a); box-shadow: 0 0 14px rgba(255, 190, 40, .9); border-color: #ffd04a; }
+.p-line .count b { margin-left: 14px; font-size: 60px; color: var(--gold-text); text-shadow: 0 0 16px rgba(255, 190, 40, .7); }
+.p-line .count-wait { font-size: 30px; font-style: normal; font-weight: 600; color: var(--text-3); letter-spacing: 1px; }
+/* Lyrics page */
+.box-head #lyr-undo { margin-left: auto; flex: none; }
+#lyr-undo[hidden] { display: none; }
+.small-pill { height: 28px; padding: 0 12px; font-size: 14.5px; border-radius: 6px; cursor: pointer; }
+.status-list .small-pill { margin-top: 8px; }
+.status-list i.busy { background: #4fb4ff; box-shadow: 0 0 6px #4fb4ff; animation: cc-pulse 1.2s ease-in-out infinite; }
+@keyframes cc-pulse { 50% { opacity: .35; } }
+.ll { cursor: pointer; }
+.ll:hover { background: rgba(255, 200, 60, .10) !important; }
+.ll.on { background: rgba(255, 190, 40, .16) !important; box-shadow: inset 3px 0 0 #ffc83a; }
+.ll.unheard .txt { color: var(--text-3); }
+.ll.unheard .span i { background: linear-gradient(90deg, #4a5a7a, #6b7d9c); box-shadow: none; }
+.ll.unsure .t { color: #ffb020; }
+.ll-empty { padding: 30px 18px; font-size: 17px; line-height: 1.5; color: var(--text-2); text-align: center; }
+.sec-row small { margin-left: auto; font-size: 14px; color: var(--text-3); }
+.sec-row.on small { color: inherit; }
+.sec-empty { padding: 10px; font-size: 15px; line-height: 1.45; }
+/* Song view: the current line and each take's sung phrases */
+.lane .line-band { position: absolute; top: 0; bottom: 0; background: rgba(255, 200, 60, .16); border-left: 1px solid rgba(255, 200, 60, .45); border-right: 1px solid rgba(255, 200, 60, .45); pointer-events: none; }
+.lane .phrase { position: absolute; bottom: 2px; height: 3px; border-radius: 2px; background: rgba(120, 200, 255, .55); pointer-events: none; }
+#stage[data-theme="light"] .lane .phrase { background: rgba(40, 120, 200, .45); }
+/* take list: listened to or not */
+.heard-dot { display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 50%; vertical-align: middle; }
+.heard-dot.done { background: #4cf08f; box-shadow: 0 0 4px #4cf08f; }
+.heard-dot.waiting { background: #4fb4ff; animation: cc-pulse 1.2s ease-in-out infinite; }
+.heard-dot.failed { background: #ffb020; }

@@ -232,6 +232,35 @@ Pass: on the owner's real takes, lines land within a word of where they belong.
 4. Teleprompter: real lyrics following the DAW's position, current line lit, count-in.
 5. From My Songs: Song Rider Pro / Song Savant / Key Compass files (formats read from their repos).
 
+**M2 status (0.3.0, 2026-11-23): steps 1-4 built; From My Songs next.** What's in it:
+- **Lyrics** (engine `Lyrics`, `TextFile`): headings in every style (`[Verse 1]`, `Chorus:`, `(Bridge)`, `VERSE 2`),
+  a heading named again with no lines sings that section again, `[Chorus x2]` twice, notes like `(x2)` / `*repeat*`
+  skipped, .lrc times kept. Files: .txt / .lrc in UTF-8, UTF-16 or Windows-1252, Word .docx (the plug-in unzips it,
+  the engine reads `word/document.xml`). Curly quotes and dashes don't get in the way of matching words.
+- **The song is shared**: the lyrics live once per project (a registry of every copy in the DAW), each copy saves them
+  with a time stamp (`[cc-lyrics]` in its state) and the newest wins on load; editing in one copy updates all and
+  marks the project changed. When the last copy closes the lyrics are cleared (a new project starts empty). Two
+  projects open at once in one DAW would share them (rare; noted).
+- **Listening** (`plugin/Listening`, engine `Speech`): one low-priority thread for the whole session; each sung take
+  (not guitars, not ARA takes yet) is read, split into phrases, resampled to 16 kHz and heard by whisper.cpp
+  (base.en q5_1, greedy, one word per segment with token times), max half the cores (4 at most), waiting while any
+  copy is capturing. Words outside every phrase (by 0.35 s) are dropped (hallucinations in silence). Saved next to
+  the take as `Take N.words` (words, phrases, model name) and read back next time; a different model listens again.
+  The model sits in each bundle's `Contents/Resources` (CI copies it there; the standalone also finds it in an
+  installed VST3). x86 builds need AVX2 + FMA (checked at run time: older processors get a plain message).
+  Speed: ~11 s for a 105 s vocal on 2 cores.
+- **Lining up** (engine `Align`, `LineUp`): local alignment of lyric words vs heard words per take (fuzzy word
+  likeness), word times per shown word; then a take covering part of the song is aligned again against the lines
+  that longer takes placed around its position (a punch-in on the 3rd chorus lands on the 3rd chorus). Song timing per
+  line comes from the take that sang it most clearly (lead first); lines no take sang sit between their neighbours.
+  Tried on the owner's Don Birthday vocal with a changed lyric sheet: all 30 lines placed.
+- **Interface**: Lyrics page (editor with Undo, lined-up list with bar.beat, Lyrics Status with listening progress,
+  Hear It with Replace / Add below), lyric strip on every page (current line, sections on the song's time, overview),
+  teleprompter following the DAW (words light up, count-in dots in the two bars before a line), Song view shades the
+  current line and shows each take's phrases, take list shows a listened-to dot.
+- Not yet: From My Songs; ARA takes aren't listened to yet (their audio comes through the ARA reader: later);
+  dragging a line's ends by hand (M3/M4, with comping).
+
 ### M3 - Scores
 The five scores, the Styles, the reasons. Pass: on the owner's sessions, Comp Captain's top pick matches the
 owner's own pick on most lines (we count it), and every "bad line" it flags really has the problem it names.

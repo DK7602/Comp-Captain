@@ -1,9 +1,13 @@
 COMP CAPTAIN - HOW TO INSTALL
 =============================
 
-This version is M1 (0.2.0): takes in. Record takes with CAPTURE, add audio files, or bring in the takes on a
-Cubase track's lanes (ARA). Every take lands on its bar. Lyrics, scores and comping come next; those pages still
-show a sample song (marked SAMPLE). On your track it passes your audio through untouched.
+This version is M2 (0.3.0): takes and lyrics in. Record takes with CAPTURE, add audio files, or bring in the takes
+on a Cubase track's lanes (ARA). Every take lands on its bar. Give it your lyrics and it listens to your takes and
+lines every line up, so the teleprompter follows your song. Scores and comping come next; those parts still show a
+sample song (marked SAMPLE). On your track it passes your audio through untouched.
+
+The "Comp Captain.vst3" folder is bigger now (about 60 MB): it carries the speech model that listens to your takes,
+on your computer (nothing is sent anywhere). Copy the whole folder, as before.
 
 WINDOWS (Cubase and other DAWs)
 1. Close your DAW.
@@ -11,7 +15,8 @@ WINDOWS (Cubase and other DAWs)
    (Windows may ask for permission: click Continue.)
 3. Open your DAW. In Cubase, if it doesn't show up, open Studio > VST Plug-in Manager and click Rescan.
 4. Put Comp Captain on a vocal track as an insert effect, then open it.
-   "Comp Captain.exe" is the standalone version: double-click it to try it without a DAW.
+   "Comp Captain.exe" is the standalone version: double-click it to try it without a DAW. (It borrows the speech
+   model from the installed VST3, so copy the VST3 first.)
 
 MAC
 1. Copy "Comp Captain.vst3" into  /Library/Audio/Plug-Ins/VST3
@@ -23,19 +28,24 @@ MAC
 LINUX
 Copy "Comp Captain.vst3" into  ~/.vst3
 
-TRY M1 IN CUBASE (the test for this version)
-1. Put Comp Captain on your vocal track (insert). Turn on the track's Monitor button (the speaker).
-2. Open Comp Captain, go to the Record page, click the big red button (it glows: armed).
-3. Record 5 takes in Cubase (or one cycle recording that loops 5 times). Each pass shows up in the TAKES list,
-   with the bar it started on. The Comp page's Song view shows them all on the song's bars.
-4. Takes are saved in Documents > Comp Captain (a folder per track). Save the project, close it, reopen it:
-   the takes are still listed.
-5. ARA: on a track with takes on lanes, select the takes, then Audio > Extensions > Comp Captain.
-   Open Comp Captain's Settings (gear), click Copy next to ARA, and paste the report into the chat.
+TRY M2 IN CUBASE (the test for this version)
+1. Put Comp Captain on your vocal track (insert), as before. Turn on the track's Monitor button (the speaker).
+2. Lyrics page: paste your song's lyrics into the box (or Open File: .txt or Word .docx). Put [Verse 1],
+   [Chorus] and so on above each part.
+3. Record page: arm the red button and record a take or two of the song (or part of it).
+4. Wait a few seconds after each take: the Lyrics page shows "Listening to Take 1..." and then each line with the
+   bar it's sung at. Check: do the lines land where you sang them (within a word)?
+5. Play the song in Cubase with the Record page open: the teleprompter follows, the words light up as they're sung,
+   and the beats count down before each line.
+6. Try Hear It on a take without lyrics in the box: it writes the words it heard.
+7. Save, close and reopen the project: the lyrics are still there, and the lining up comes back straight away.
+8. Still open from M1: the ARA report (select the takes on a track's lanes, Audio > Extensions > Comp Captain,
+   then Settings (gear) > Copy next to ARA, and paste it into the chat).
 
 TIPS
 - Click the logo to switch between the light and dark look.
 - Drop WAV, AIFF, FLAC or MP3 files on the window to add them as takes (you pick the bar).
+- Drop a lyrics file (.txt, .lrc, .docx) on the window to load your lyrics.
 - Click the red button again when you're done, so it doesn't capture while you record other tracks.
 - Drag the window's corner to make it bigger or smaller, or use the gear (settings) button.
 - The ? button opens the manual.

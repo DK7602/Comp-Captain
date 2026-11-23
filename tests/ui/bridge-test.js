@@ -122,6 +122,71 @@ const { chromium } = require('playwright');
   await p.waitForTimeout(50);
   check((await p.textContent('#set-report-text')).includes('Takes: 3'), 'the report shows in Settings');
 
+  await p.click('#settings [data-close]');
+
+  // ---------------------------------------------------------------- M2: lyrics
+  await p.click('.nav-btn[data-go="lyrics"]');
+  const lyricsText = '[Verse 1]\nI was lost in the dark\nbut You found me\n[Chorus]\nI\'m alive, I\'m alive\n';
+  const line = (text, section, start, end, extra) => Object.assign({ text, section, start, end, startQ: start * 92 / 60, endQ: end * 92 / 60, sure: 0.9, takes: 2, from: 'Take 2 (Lead Vox)',
+    words: text.split(' ').map((w, i, a) => [start + (end - start) * i / a.length, start + (end - start) * (i + 1) / a.length, 1]) }, extra || {});
+  await send({ type: 'lyrics', text: lyricsText, linedUp: 2, sungTakes: 2, heardTakes: 2,
+    sections: [{ name: 'Verse 1', first: 0, count: 2 }, { name: 'Chorus', first: 2, count: 1 }],
+    lines: [line('I was lost in the dark', 0, 21.0, 23.4), line('but You found me', 0, 24.0, 25.6), line('I\'m alive, I\'m alive', 1, 27.0, 29.0, { takes: 0, sure: 0, from: '' })] });
+  await p.waitForTimeout(100);
+  check((await p.inputValue('#lyr-text')) === lyricsText, 'the Lyrics box shows the song\'s lyrics');
+  const lyrRows = await p.$$eval('#lyr-list .ll:not(.head)', (r) => r.map((x) => x.querySelector('.t').textContent + '|' + x.querySelector('.txt').textContent));
+  check(lyrRows.join() === '9|I was lost in the dark,10|but You found me,11.2|I\'m alive, I\'m alive', 'each line shows the bar it\'s sung at (' + lyrRows.join(', ') + ')');
+  check((await p.$$eval('#lyr-list .ll.head .sec', (r) => r.map((x) => x.textContent))).join() === 'VERSE 1,CHORUS', 'lines are grouped in their sections');
+  check(await p.$eval('#lyr-list .ll:not(.head):nth-last-child(1)', (e) => e.classList.contains('unheard')), 'a line no take sang is dimmed');
+  check((await p.textContent('#lyr-status')).includes('3 lines \u00B7 2 sections'), 'Lyrics Status counts lines and sections');
+  check((await p.$$eval('#section-chips .chip', (r) => r.map((x) => x.textContent))).join() === 'Verse 1,Chorus', 'the section strip shows the song\'s sections');
+
+  await p.fill('#lyr-text', lyricsText + 'singing out\n');
+  await p.click('#lyr-list');
+  await p.waitForTimeout(600);
+  out = await sent();
+  check(out.some((m) => m.type === 'lyricsSet' && m.text.endsWith('singing out\n')), 'typing in the box sends the lyrics to the plug-in');
+  await p.click('#lyr-open');
+  out = await sent();
+  check(out.some((m) => m.type === 'lyricsOpen'), 'Open File asks the plug-in to open a lyrics file');
+  await send({ type: 'lyricsLoaded', name: 'Brand New Start.docx', text: '[Chorus]\nHallelujah\n' });
+  await p.waitForTimeout(50);
+  check((await p.inputValue('#lyr-text')) === '[Chorus]\nHallelujah\n' && await p.isVisible('#lyr-undo'), 'an opened file fills the box, with Undo');
+  await sent();
+  await p.click('#lyr-undo');
+  out = await sent();
+  check(out.some((m) => m.type === 'lyricsSet' && m.text.endsWith('singing out\n')), 'Undo brings the old lyrics back');
+  await p.click('#lyr-hear');
+  out = await sent();
+  check(out.some((m) => m.type === 'hearIt'), 'Hear It asks the plug-in for the words it heard');
+  await send({ type: 'hearIt', text: 'I was lost in the dark\n', from: 'Take 2' });
+  await p.waitForTimeout(50);
+  check(await p.isVisible('#dialog-body .dlg-title'), 'with lyrics already there, Hear It asks before replacing them');
+  await p.click('#dialog-body button:has-text("Replace")');
+  out = await sent();
+  check(out.some((m) => m.type === 'lyricsSet' && m.text === 'I was lost in the dark\n'), 'Replace puts the heard words in');
+  await send({ type: 'listening', now: 'Take 3 (Lead Vox)', percent: 40, waiting: 1, paused: false, problem: '' });
+  await p.waitForTimeout(50);
+  check((await p.textContent('#lyr-status')).includes('Listening to Take 3 (Lead Vox)\u2026 40%'), 'Lyrics Status shows the take being listened to');
+
+  // the teleprompter follows the DAW
+  await send({ type: 'lyrics', text: lyricsText, linedUp: 2, sungTakes: 2, heardTakes: 2,
+    sections: [{ name: 'Verse 1', first: 0, count: 2 }, { name: 'Chorus', first: 2, count: 1 }],
+    lines: [line('I was lost in the dark', 0, 21.0, 23.4), line('but You found me', 0, 24.0, 25.6), line('I\'m alive, I\'m alive', 1, 27.0, 29.0)] });
+  await p.click('.nav-btn[data-go="record"]');
+  await send({ type: 'transport', known: true, playing: true, recording: false, ppq: 24.0 * 92 / 60, seconds: 24.6, bpm: 92, num: 4, den: 4 });
+  await p.waitForTimeout(120);
+  check((await p.textContent('#p-now')) === 'but You found me', 'the teleprompter shows the line being sung');
+  check((await p.textContent('#p-prev')) === 'I was lost in the dark' && (await p.textContent('#p-next')) === 'I\'m alive, I\'m alive', 'with the line before above it and the next below');
+  check((await p.$$eval('#p-now .sung', (r) => r.length)) >= 1, 'the words already sung light up');
+  check((await p.textContent('#rec-section')) === 'Verse 1', 'the section follows the song');
+  await send({ type: 'transport', known: true, playing: true, recording: false, ppq: 19.4 * 92 / 60, seconds: 19.4, bpm: 92, num: 4, den: 4 });
+  await p.waitForTimeout(120);
+  check(await p.$eval('#p-prev', (e) => e.classList.contains('counting') && !!e.querySelector('.count')), 'the beats before the first line count down');
+  await send({ type: 'transport', known: true, playing: false, recording: false, ppq: 27.5 * 92 / 60, seconds: 27.5, bpm: 92, num: 4, den: 4 });
+  await p.waitForTimeout(120);
+  check((await p.textContent('#p-now')) === 'I\'m alive, I\'m alive', 'stopped: it shows the line where the playhead is');
+
   check(errors.length === 0, 'no script errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
   await b.close();
 })();

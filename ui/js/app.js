@@ -1,5 +1,6 @@
-// Comp Captain interface: pages, light / dark, manual and settings. Real takes (M1) come from takes.js;
-// the parts that need lyrics and scores (M2, M3) still show a sample song, clearly marked.
+// Comp Captain interface: pages, light / dark, manual and settings. Real takes (M1) come from takes.js and
+// the song's lyrics with their times (M2) from song.js; the parts that need scores (M3+) still show a
+// sample song, clearly marked.
 'use strict';
 
 (() => {
@@ -13,6 +14,7 @@
   const stage = $('#stage');
   const D = Demo;
   const T = Takes, TS = Takes.st;
+  const SG = Song, SS = Song.st;
   const real = () => TS.real;
   if (real()) stage.dataset.real = '1';
   const PAGES = ['record', 'lyrics', 'comp', 'tighten', 'review', 'export'];
@@ -22,7 +24,10 @@
     theme: Bridge.localGet('theme', 'dark'),
     page: Bridge.localGet('page', 'comp'),
     compView: Bridge.localGet('compView', 'line'),
-    line: 2,
+    line: 2,            // the sample song's line (Comp page scores, until M3)
+    sl: 0,              // the song's current lyric line (lyric bar, teleprompter, Lyrics page)
+    following: false,   // the lit line follows the DAW's playhead
+    lyrUndo: null,      // the lyrics before the last Paste / Open / Hear It
     choice: [],
     undo: [], redo: [],
     style: 'Worship / Gospel',
@@ -35,7 +40,7 @@
     align: JSON.parse(JSON.stringify(D.alignDefaults)),
     exportOn: {},
     sonicology: { voxology: 'installed', mixology: 'installed' },
-    version: '0.2.1', host: 'Browser preview',
+    version: '0.3.0', host: 'Browser preview',
     level: 0,
   };
   if (!PAGES.includes(S.page)) S.page = 'comp';
@@ -149,30 +154,56 @@
     renderComp();
   }
 
+  // ------------------------------------------------------------------ the song's time
+  // Seconds into the song: the DAW's playhead inside the plug-in (moving on smoothly between its
+  // messages), the sample song's clock in a browser. -1 when the DAW hasn't said.
+  function songTime() {
+    if (!Bridge.inHost) return S.time;
+    const t = TS.transport;
+    if (!t.known) return -1;
+    return (+t.seconds || 0) + (t.playing ? (performance.now() - t.at) / 1000 : 0);
+  }
+  const songLength = () => { const sp = SG.span(); return sp ? sp[1] : (Bridge.inHost ? 0 : D.length); };
+  function barText(q) {
+    const t = TS.transport, qpb = (t.num > 0 && t.den > 0) ? t.num * 4 / t.den : 4, beat = 4 / (t.den || 4);
+    const bar = Math.floor(q / qpb + 1e-6), b = Math.floor((q - bar * qpb) / beat + 1e-6);
+    return b > 0 ? `${bar + 1}.${b + 1}` : String(bar + 1);
+  }
+  const lineWhen = (l) => (!SG.timed(l) ? '\u2013' : (Bridge.inHost && l.startQ >= 0 ? barText(l.startQ) : fmtShort(l.start)));
+
   // ------------------------------------------------------------------ shared lyric bar
-  const tToX = (t, w) => (t / D.length) * w;
+  const secColors = ['#2f8fff', '#9c6bff', '#b76cff', '#7a5cff'];
   function renderLyricBar() {
-    const ln = D.lines[S.line];
+    const ln = SS.lines[S.sl];
     const lt = $('#line-text'); lt.innerHTML = '';
-    ln.words.forEach((wd, i) => {
-      const s = h('span', S.time >= wd.end || (S.time >= wd.start && S.time > ln.start) && S.time < ln.end && S.time >= wd.start ? 'sung' : '', (i ? ' ' : '') + wd.w);
-      lt.appendChild(s);
-    });
+    if (!ln) lt.appendChild(h('span', 'dim', SS.text.trim() ? '' : 'No lyrics yet: add them on the Lyrics page'));
+    else ln.shown.forEach((w, i) => lt.appendChild(h('span', '', escapeHtml((i ? ' ' : '') + w))));
+    markSung();
     fitLineText();
     const chips = $('#section-chips'); chips.innerHTML = '';
-    const cw = 1672 - 0; // positions in %, so width doesn't matter
-    D.sections.forEach((sec, i) => {
-      const c = h('div', 'chip' + (i % 2 ? '' : ' cyan') + (sec.id === ln.section ? ' on' : ''), sec.name);
-      const a = sec.start / D.length * 100, b = sec.end / D.length * 100;
-      c.style.left = `calc(${a}% + 3px)`; c.style.width = `calc(${b - a}% - 6px)`;
-      c.onclick = () => { const first = D.lines.find((l) => l.section === sec.id); if (first) setLine(first.id, true); };
+    const sp = SG.span(), secs = SS.sections;
+    secs.forEach((sec, i) => {
+      const c = h('div', 'chip' + (i % 2 ? '' : ' cyan') + (ln && ln.section === i ? ' on' : ''), escapeHtml(sec.name));
+      let a = i / secs.length * 100, b = (i + 1) / secs.length * 100;
+      if (sp && sec.start >= 0) { a = (sec.start - sp[0]) / (sp[1] - sp[0]) * 100; b = (sec.end - sp[0]) / (sp[1] - sp[0]) * 100; }
+      c.style.left = `calc(${a}% + 3px)`; c.style.width = `calc(${Math.max(1.5, b - a)}% - 6px)`;
+      c.title = sec.name + (sec.start >= 0 ? ` \u00B7 ${lineWhen(SS.lines[sec.first])}` : '');
+      c.onclick = () => setLine(sec.first, true);
       chips.appendChild(c);
     });
     const ru = $('#ruler'); ru.innerHTML = '';
-    for (let t = 0; t <= D.length; t += 8) { const s = h('span', '', fmtShort(t)); s.style.left = (t / D.length * 100) + '%'; ru.appendChild(s); }
-    const s = h('span', '', fmtShort(D.length)); s.style.left = '100%'; ru.appendChild(s);
+    if (sp) {
+      const len = sp[1] - sp[0], step = len > 240 ? 30 : len > 90 ? 15 : len > 40 ? 8 : 4;
+      for (let t = Math.ceil(sp[0] / step) * step; t <= sp[1]; t += step) { const e = h('span', '', fmtShort(t)); e.style.left = ((t - sp[0]) / len * 100) + '%'; ru.appendChild(e); }
+    }
     drawOverview();
     movePlayheads();
+  }
+  // The words already sung light up gold.
+  function markSung() {
+    const ln = SS.lines[S.sl], t = songTime();
+    const on = ln && SG.timed(ln) && t >= ln.start - 0.05;
+    $$('#line-text span').forEach((e, i) => e.classList.toggle('sung', !!on && !!ln.words[i] && t >= ln.words[i][0]));
   }
   // The current lyric line is big (40px) and only shrinks as much as a long line needs to fit.
   function fitLineText() {
@@ -180,32 +211,52 @@
     const room = lt.clientWidth, need = lt.scrollWidth;
     if (room > 0 && need > room) lt.style.fontSize = Math.max(24, Math.floor(40 * room / need)) + 'px';
   }
+  // The song in one strip: where each line is sung, coloured by section, the current line gold.
   function drawOverview() {
-    const secColor = (t) => {
-      const sec = D.sections.find((x) => t >= x.start && t < x.end) || D.sections[0];
-      if (sec.id === D.lines[S.line].section) return '#ffc531';
-      return ['#2f8fff', '#9c6bff', '#b76cff', '#7a5cff'][sec.id % 4];
+    const sp = SG.span(), cv = $('#overview');
+    if (!sp) { Wave.draw(cv, { t0: 0, t1: 1, env: () => -1, color: '#ffc531', glow: 0, noise: false }); return; }
+    const ls = SS.lines.filter(SG.timed);
+    const lineAt = (t) => ls.find((l) => t >= l.start && t <= l.end);
+    const env = Bridge.inHost
+      ? (t) => { const l = lineAt(t); return l ? 0.35 + 0.65 * Math.abs(Math.sin((t - l.start) * 7.3)) * (l.takes ? 1 : 0.4) : 0.02; }
+      : (t) => 0.25 + 0.75 * D.vocalEnvelope(t, 1, 0);
+    const color = (t) => {
+      const l = lineAt(t) || ls.find((x) => x.start > t) || ls[ls.length - 1];
+      if (l === SS.lines[S.sl]) return '#ffc531';
+      return secColors[(l ? l.section : 0) % 4];
     };
-    Wave.draw($('#overview'), { t0: 0, t1: D.length, env: (t) => 0.25 + 0.75 * D.vocalEnvelope(t, 1, 0), color: secColor, seed: 3, step: 2, glow: 5 });
+    Wave.draw(cv, { t0: sp[0], t1: sp[1], env, color, seed: 3, step: 2, glow: 5 });
   }
   function movePlayheads() {
-    $('#time-now').textContent = fmt(S.time);
-    $('#time-len').textContent = fmt(D.length);
-    const ov = $('#overview');
-    $('#ov-playhead').style.left = (28 + ov.clientWidth * S.time / D.length) + 'px';
-    // best comp playhead
+    const t = songTime(), sp = SG.span();
+    $('#time-now').textContent = fmt(Math.max(0, t));
+    $('#time-len').textContent = fmt(songLength());
+    const ov = $('#overview'), oh = $('#ov-playhead');
+    oh.style.display = sp && t >= sp[0] && t <= sp[1] ? '' : 'none';
+    if (sp) oh.style.left = (28 + ov.clientWidth * (t - sp[0]) / (sp[1] - sp[0])) + 'px';
+    // best comp playhead (sample song)
     const span = compSpan();
     const bc = $('.bc-wave .p-head');
     if (bc) bc.style.left = Math.max(0, Math.min(100, (S.time - span[0]) / (span[1] - span[0]) * 100)) + '%';
-    // record page
-    const sec = D.sections[S.recSection];
-    const f = Math.max(0, Math.min(1, (S.time - sec.start) / (sec.end - sec.start)));
-    $$('.page[data-page="record"] .p-head').forEach((e) => { e.style.left = (f * 100) + '%'; });
+    // record page: through the section
+    const sec = SS.sections[S.recSection];
+    const f = sec && sec.end > sec.start ? Math.max(0, Math.min(1, (t - sec.start) / (sec.end - sec.start))) : 0;
+    $$('.page[data-page="record"] .prompter .p-head').forEach((e) => { e.style.left = (f * 100) + '%'; });
+  }
+  // The current lyric line on the song's bars (for the Song view), or null.
+  function laneBand() {
+    const l = SS.lines[S.sl];
+    return l && SG.timed(l) && l.startQ >= 0 ? [l.startQ, l.endQ] : null;
   }
   function setLine(li, seek) {
-    S.line = Math.max(0, Math.min(D.lines.length - 1, li));
-    if (seek) S.time = D.lines[S.line].start;
-    renderLyricBar(); renderComp(); renderRecord();
+    S.sl = Math.max(0, Math.min(SS.lines.length - 1, li));
+    const sec = SG.sectionOf(S.sl);
+    if (sec >= 0) S.recSection = sec;
+    if (!Bridge.inHost) {
+      S.line = Math.max(0, Math.min(D.lines.length - 1, li));
+      if (seek && SS.lines[S.sl] && SG.timed(SS.lines[S.sl])) S.time = SS.lines[S.sl].start;
+    }
+    renderLyricBar(); renderComp(); renderRecord(); renderLyricsList();
   }
 
   // ------------------------------------------------------------------ COMP page
@@ -238,7 +289,7 @@
 
     // Real takes: the Song view shows every take on the song's bars (the Line view needs lyrics + scores)
     if (real()) {
-      T.drawLanes($('#lanes'), $('#lane-lyrics'));
+      T.drawLanes($('#lanes'), $('#lane-lyrics'), laneBand());
       renderBestCompNote();
       renderScorePanel();
       movePlayheads();
@@ -301,7 +352,7 @@
   }
   function renderBestCompNote() {
     Wave.draw($('#bc-canvas'), { t0: 0, t1: 1, env: () => -1, color: '#ffc531', glow: 0, noise: false });
-    $('#bc-tags').innerHTML = '<div class="bc-note">Your best comp is built here from your real takes once lyrics (M2) and scores (M3) are in.</div>';
+    $('#bc-tags').innerHTML = '<div class="bc-note">Your best comp is built here from your real takes once scores (M3) are in. Your lyrics are already lined up.</div>';
   }
   function shade(hex) { const n = parseInt(hex.slice(1), 16); const f = (v) => Math.round(v * 0.45); return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`; }
 
@@ -330,33 +381,25 @@
 
   // ------------------------------------------------------------------ RECORD page
   function renderRecord() {
-    const sec = D.sections[S.recSection];
-    $('#rec-section').textContent = sec.name;
+    const sec = SS.sections[S.recSection];
+    $('#rec-section').textContent = sec ? sec.name : 'No lyrics';
     const armed = real() ? TS.capture.armed : S.armed;
     $('#r-arm').classList.toggle('armed', armed);
     $('#r-arm').classList.toggle('recording', real() && TS.capture.recording);
     $('#rec-loop').classList.toggle('on', S.recLoop);
     $('#rec-click').classList.toggle('on', S.recClick);
-    // teleprompter: the line being sung (or next one) in the middle
-    const secLines = D.lines.filter((l) => l.section === sec.id);
-    let cur = D.lines.findIndex((l) => S.time < l.end);
-    if (cur < 0) cur = D.lines.length - 1;
-    if (!secLines.length) cur = S.line;
-    const lineHTML = (l, live) => !l ? '' : l.words.map((w) => (live && S.time >= w.start ? `<span class="sung">${w.w}</span>` : w.w)).join(' ');
-    $('#p-prev').innerHTML = lineHTML(D.lines[cur - 1], false);
-    $('#p-now').innerHTML = lineHTML(D.lines[cur], true);
-    $('#p-next').innerHTML = lineHTML(D.lines[cur + 1], false);
-    fitPrompter();
-    // bars and beats across the section
+    renderPrompter();
+    if (real()) { renderRecordReal(); renderSectionLists(); return; }
+    // bars and beats across the section (sample song)
+    const dsec = D.sections[Math.min(D.sections.length - 1, S.recSection + 1)] || D.sections[0];
     const bars = $('#rec-bars'); bars.innerHTML = '';
-    const beats = Math.round((sec.end - sec.start) / (D.bar / 4));
+    const beats = Math.round((dsec.end - dsec.start) / (D.bar / 4));
     for (let b = 0; b <= beats; b++) {
       const x = b / beats * 100;
       const lab = h('span', '', `${Math.floor(b / 4) + 1}.${(b % 4) + 1}`); lab.style.left = x + '%';
       if (b > 0 && b < beats) bars.appendChild(lab);
       const ln = h('i'); ln.style.left = x + '%'; bars.appendChild(ln);
     }
-    if (real()) { renderRecordReal(); renderSectionLists(); return; }
     drawRecWave();
     // takes list
     const list = $('#take-list'); list.innerHTML = '';
@@ -391,6 +434,37 @@
     $('#rec-take').textContent = live ? `\u25CF ${live.name}` : (i >= 0 ? `${TS.list[i].name} (${i + 1}/${TS.list.length})` : 'No takes yet');
     $('#rec-take').title = i >= 0 ? `${TS.list[i].name}: take ${i + 1} of ${TS.list.length}` : '';
   }
+
+  // The teleprompter: the line being sung big in the middle (words light up as they're sung), the one
+  // before above, the next one below. While the song plays it follows the playhead; with the count-in on,
+  // the beats before a line count down where the previous line was.
+  function renderPrompter() {
+    const ls = SS.lines, t = songTime();
+    const cur = S.following ? Math.max(0, SG.lineAt(t)) : S.sl;
+    const l = ls[cur];
+    const words = (x, live) => (!x ? '' : x.shown.map((w, i) => (live && SG.timed(x) && x.words[i] && t >= x.words[i][0] && t >= x.start - 0.05 ? `<span class="sung">${escapeHtml(w)}</span>` : escapeHtml(w))).join(' '));
+    const count = countIn(cur, t);
+    $('#p-prev').innerHTML = count || words(ls[cur - 1], false);
+    $('#p-prev').classList.toggle('counting', !!count);
+    $('#p-now').innerHTML = l ? words(l, S.following || !Bridge.inHost) : `<span class="dim">${SS.text.trim() ? '' : 'Your lyrics show here'}</span>`;
+    $('#p-next').innerHTML = l ? words(ls[cur + 1], false) : `<span class="dim">${SS.text.trim() ? '' : 'Add them on the Lyrics page'}</span>`;
+    fitPrompter();
+  }
+  // Beats left before line li starts, as lit dots (only in the gap before it, within two bars).
+  function countIn(li, t) {
+    if (!S.recOpts.countIn || !S.following) return '';
+    const l = SS.lines[li];
+    if (!l || !SG.timed(l) || t >= l.start) return '';
+    const tr = TS.transport, bpm = Bridge.inHost ? (+tr.bpm || 120) : D.bpm, den = Bridge.inHost ? (tr.den || 4) : 4, num = Bridge.inHost ? (tr.num || 4) : 4;
+    const beat = 60 / bpm * 4 / den, left = (l.start - t) / beat;
+    const prev = SS.lines[li - 1];
+    if (left > num * 2 || (prev && SG.timed(prev) && t < prev.end + beat * 0.5)) return '';
+    const n = Math.ceil(left - 1e-6);
+    if (n > num) return '<span class="count-wait">Next line in 2 bars</span>';
+    let dots = '';
+    for (let i = num; i >= 1; i--) dots += `<i class="${i >= n ? 'lit' : ''}"></i>`;
+    return `<span class="count">${dots}<b>${n}</b></span>`;
+  }
   // Long lines shrink so they always fit across the teleprompter.
   function fitPrompter() {
     [['#p-prev', 56], ['#p-now', 80], ['#p-next', 56]].forEach(([id, size]) => {
@@ -400,61 +474,105 @@
     });
   }
   function drawRecWave() {
-    const sec = D.sections[S.recSection];
+    const sec = D.sections[Math.min(D.sections.length - 1, S.recSection + 1)] || D.sections[0];
     const upTo = S.armed && S.playing ? S.time : sec.end;
     Wave.draw($('#rec-canvas'), { t0: sec.start, t1: sec.end, env: (t) => (t <= upTo ? D.vocalEnvelope(t, 222, 0) : 0.01), color: '#ffc531', seed: 5, step: 1.6, glow: 7 });
   }
+  // The song's sections (both side lists): click one to go to its first line.
   function renderSectionLists() {
     for (const id of ['#sec-list', '#sec-list-2']) {
       const box = $(id); box.innerHTML = '';
-      const seen = new Set();
-      D.sections.forEach((sec) => {
-        if (sec.name === 'Intro' || sec.name === 'Outro' || seen.has(sec.name)) return; seen.add(sec.name);
-        const on = id === '#sec-list' ? D.sections[S.recSection].name === sec.name : D.sections[D.lines[S.line].section].name === sec.name;
-        const r = h('div', 'sec-row' + (on ? ' on' : ''), `<span class="check">${on ? '\u2713' : ''}</span>${sec.name}`);
-        r.onclick = () => {
-          if (id === '#sec-list') { S.recSection = sec.id; S.time = sec.start; renderRecord(); movePlayheads(); }
-          else { const first = D.lines.find((l) => l.section === sec.id); if (first) setLine(first.id, true); }
-        };
+      if (!SS.sections.length) { box.appendChild(h('div', 'sec-empty dim', 'Put <b>[Verse 1]</b>, <b>[Chorus]</b>\u2026 above the lines on the Lyrics page to make sections.')); continue; }
+      const cur = SG.sectionOf(S.sl);
+      SS.sections.forEach((sec, i) => {
+        const on = id === '#sec-list' ? i === S.recSection : i === cur;
+        const when = sec.start >= 0 ? `<small>${lineWhen(SS.lines[sec.first])}</small>` : '';
+        const r = h('div', 'sec-row' + (on ? ' on' : ''), `<span class="check">${on ? '\u2713' : ''}</span>${escapeHtml(sec.name)}${when}`);
+        r.onclick = () => { S.recSection = i; setLine(sec.first, true); };
         box.appendChild(r);
       });
     }
   }
 
   // ------------------------------------------------------------------ LYRICS page
-  const demoLyricsText = () => {
-    let out = '', last = -1;
-    D.lines.forEach((l) => { if (l.section !== last) { out += (out ? '\n' : '') + `[${D.sections[l.section].name}]\n`; last = l.section; } out += l.text + '\n'; });
-    return out;
-  };
-  function parseLyrics(text) {
-    const res = []; let sec = 'Verse 1';
-    text.split(/\r?\n/).forEach((raw) => {
-      const line = raw.replace(/^\[\d+:\d+(\.\d+)?\]/, '').trim(); // .lrc time tags
-      if (!line) return;
-      const m = line.match(/^\[(.+)\]$/); if (m) { sec = m[1]; res.push({ head: sec }); return; }
-      res.push({ text: line, section: sec });
-    });
-    return res;
-  }
+  // Each line with where it's sung (bar.beat), a bar showing where in the song, and how sure that is.
   function renderLyricsList() {
-    const items = parseLyrics($('#lyr-text').value);
     const list = $('#lyr-list'); list.innerHTML = '';
-    let n = 0;
-    items.forEach((it) => {
-      if (it.head) { list.appendChild(h('div', 'll head', `<span class="sec">${it.head.toUpperCase()}</span>`)); return; }
-      const demo = D.lines[n];
-      const r = h('div', 'll');
-      if (demo) {
-        const a = demo.start / D.length * 100, b = demo.end / D.length * 100;
-        r.innerHTML = `<span class="t">${fmtShort(demo.start)}</span><span class="txt">${escapeHtml(it.text)}</span><span class="span"><i style="left:${a}%;width:${Math.max(2, b - a)}%"></i></span>`;
-      } else {
-        r.innerHTML = `<span class="t">\u2013</span><span class="txt">${escapeHtml(it.text)}</span><span class="dim small">not lined up yet</span>`;
+    if (!SS.lines.length) {
+      list.appendChild(h('div', 'll-empty', SS.text.trim() ? 'No sung lines found yet.' : 'Your lines show up here, each with the bar it\u2019s sung at, once a take has been listened to.<br><br>Paste or type your lyrics on the left, open a file, or let <b>Hear It</b> write them from a take.'));
+      renderLyricsStatus();
+      return;
+    }
+    const sp = SG.span();
+    let lastSec = -1;
+    SS.lines.forEach((l, i) => {
+      if (l.section !== lastSec) {
+        lastSec = l.section;
+        const sec = SS.sections[l.section];
+        list.appendChild(h('div', 'll head', `<span class="sec">${escapeHtml(sec ? sec.name : '').toUpperCase()}</span>`));
       }
-      list.appendChild(r); n++;
+      const heard = l.takes > 0;
+      const r = h('div', 'll' + (i === S.sl ? ' on' : '') + (heard ? '' : ' unheard') + (heard && l.sure < 0.5 ? ' unsure' : ''));
+      let where = `<span class="dim small">${SS.heardTakes ? 'not heard yet' : ''}</span>`;
+      if (sp && SG.timed(l)) {
+        const a = (l.start - sp[0]) / (sp[1] - sp[0]) * 100, b = (l.end - sp[0]) / (sp[1] - sp[0]) * 100;
+        where = `<span class="span"><i style="left:${a}%;width:${Math.max(2, b - a)}%"></i></span>`;
+      }
+      r.innerHTML = `<span class="t">${lineWhen(l)}</span><span class="txt">${escapeHtml(l.text)}</span>${where}`;
+      r.title = SG.whereFrom(l);
+      r.onclick = () => setLine(i, true);
+      list.appendChild(r);
     });
+    const on = list.querySelector('.ll.on');
+    if (on && on.dataset.shown !== '1') { on.scrollIntoView({ block: 'nearest' }); on.dataset.shown = '1'; }
+    renderLyricsStatus();
   }
-  const escapeHtml = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  // Lyrics Status (right side): lines and sections, listening, lining up, lines to check.
+  function renderLyricsStatus() {
+    const box = $('#lyr-status'); if (!box) return;
+    const L = SS.listening, rows = [];
+    const add = (kind, text) => rows.push(`<div><i class="${kind}"></i>${text}</div>`);
+    if (SS.lines.length) add('ok', `${SS.lines.length} line${SS.lines.length === 1 ? '' : 's'} \u00B7 ${SS.sections.length} section${SS.sections.length === 1 ? '' : 's'}`);
+    else add('warn', 'No lyrics yet');
+    if (L.problem) add('warn', escapeHtml(L.problem));
+    else if (L.now) add('busy', `Listening to ${escapeHtml(L.now)}\u2026 ${L.percent}%`);
+    else if (L.paused) add('busy', 'Waiting while a take records');
+    if (Bridge.inHost && !L.problem) {
+      if (!SS.sungTakes) add('warn', 'No vocal takes yet');
+      else add(SS.heardTakes === SS.sungTakes ? 'ok' : 'busy', `${SS.heardTakes} of ${SS.sungTakes} vocal take${SS.sungTakes === 1 ? '' : 's'} listened to`);
+    }
+    if (SS.lines.length && SS.heardTakes) {
+      if (SS.linedUp) add('ok', `Lined up on ${SS.linedUp} take${SS.linedUp === 1 ? '' : 's'}`);
+      else add('warn', 'These lyrics weren\u2019t heard in any take yet');
+      const missing = SS.lines.map((l, i) => (l.takes ? -1 : i)).filter((i) => i >= 0);
+      if (SS.linedUp && missing.length) add('warn', missing.length === 1 ? `Line ${missing[0] + 1} wasn\u2019t heard: check it` : `${missing.length} lines weren\u2019t heard (dimmed)`);
+      else if (SS.linedUp) add('ok', 'Every line was found');
+    }
+    box.innerHTML = rows.join('') + (Bridge.inHost && SS.sungTakes ? '<button class="pill small-pill" id="lyr-again">Listen to the takes again</button>' : '');
+    const again = $('#lyr-again');
+    if (again) again.onclick = () => { SG.listenAgain(); toast('Listening to this track\u2019s takes again.'); };
+  }
+  // The lyrics box shows the song's lyrics (unless you're typing in it).
+  function showLyricsText(force) {
+    const ta = $('#lyr-text');
+    if (force || document.activeElement !== ta) { if (ta.value !== SS.text) ta.value = SS.text; }
+  }
+  // Paste, Open and Hear It replace the lyrics; Undo brings back what was there.
+  function replaceLyrics(text, message) {
+    const before = $('#lyr-text').value;
+    S.lyrUndo = before.trim() && before !== text ? before : null;
+    $('#lyr-undo').hidden = !S.lyrUndo;
+    $('#lyr-text').value = text;
+    SG.setText(text, true);
+    if (message) toast(message + (S.lyrUndo ? ' (Undo brings back the old ones.)' : ''), 4000);
+  }
+  function lyricsDialog(title, body, buttons) {
+    const ov = $('#dialog'), box = $('#dialog-body');
+    box.innerHTML = `<div class="dlg-title">${title}</div><p>${body}</p><div class="dlg-buttons">${buttons.map((b, i) => `<button class="pill${b.main ? ' gold-btn' : ''}" data-b="${i}">${b.label}</button>`).join('')}</div>`;
+    ov.hidden = false;
+    $$('button', box).forEach((e) => { e.onclick = () => { ov.hidden = true; const b = buttons[+e.dataset.b]; if (b.fn) b.fn(); }; });
+  }
+  const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   // ------------------------------------------------------------------ TIGHTEN page
   function renderTighten() {
@@ -587,13 +705,23 @@
     if (S.sonicology[k] === 'installed') toast(`Put ${name} on your ${k === 'voxology' ? 'lead vocal track' : 'mix bus'}, then click Send again.`);
     else soon(`Sending to ${name}`, 'M6');
   }
+  function lyricsMessage() {
+    const n = SS.lines.length, L = SS.listening;
+    const ticks = ['Nothing sent online', 'Saved with your project', 'Every Comp Captain shares them'];
+    if (!n) return ['Add your lyrics: paste, type, open a file, or Hear It', ticks];
+    if (L.problem) return [L.problem, ticks];
+    if (L.now) return [`Listening to ${L.now}\u2026 ${L.percent}%`, ticks];
+    if (Bridge.inHost && !SS.heardTakes) return [`${n} lines ready: they line up once a take is listened to`, ticks];
+    const found = SS.lines.filter((l) => l.takes > 0).length;
+    return [`${found} of ${n} lines lined up with your takes`, [`${SS.sections.length} section${SS.sections.length === 1 ? '' : 's'}`, `Lined up on ${SS.linedUp} take${SS.linedUp === 1 ? '' : 's'}`, 'Saved with your project']];
+  }
   function renderFooter() {
     const p = S.page;
     const ov = Math.round(D.lines.reduce((a, l, i) => a + total(D.scores[i][S.choice[i]], S.weights), 0) / D.lines.length);
     const flagged = D.lines.filter((l, i) => D.scores[i][S.choice[i]].warn).length;
     const msgs = {
       record: real() ? T.status() : [S.armed ? (S.playing ? `Recording Take ${D.takes.length + 1}` : `Armed: press Record in your DAW`) : 'Lyrics locked to the beat', ['Count-in on screen', 'Every pass becomes a take', 'Bar-stamped']],
-      lyrics: [`${D.lines.length} lines lined up with your takes`, ['4 sections found', `Lined up on ${D.takes.length} takes`, 'Line 7: check the end']],
+      lyrics: lyricsMessage(),
       comp: [`Comp complete! Best of ${D.takes.length} takes, line by line.`, ['Strongest pitch & timing', 'Consistent tone', 'High energy', 'Joins in the breaths']],
       tighten: ['Layers are tight and in time with the lead.', ['Doubles within 12 ms', 'Ad-libs left natural', 'BV lined up', 'Guitars on the grid']],
       review: [`Average score ${ov}%${flagged ? ` \u00B7 ${flagged} line${flagged > 1 ? 's' : ''} to check` : ''}`, [`Style: ${S.style}`, 'Hearts win ties', 'Click a line to comp it']],
@@ -605,7 +733,7 @@
     const ob = $('#opt-box'); ob.className = 'opt-box' + (p === 'record' ? ' record' : ''); ob.innerHTML = '';
     if (p === 'record') {
       if (real()) S.recOpts.loopTakes = TS.capture.loopTakes;
-      const opts = [['countIn', 'Count-in on screen', '(2 bars, arrives in M2)'], ['loopTakes', 'Loop Takes', '(each time your DAW\'s loop comes round)'],
+      const opts = [['countIn', 'Count-in on screen', '(the beats before each line)'], ['loopTakes', 'Loop Takes', '(each time your DAW\'s loop comes round)'],
         real() ? ['folder', 'Takes Folder', '(open where your takes are saved)'] : ['autoNext', 'Auto Next Take', '(after Stop)'], ['guide', 'Guide Vocal', '(hear your best take while you sing, M4)']];
       opts.forEach(([k, a, b]) => {
         const mark = k === 'folder' ? `<span class="check folder">${icon('i-folder')}</span>` : `<span class="check ${S.recOpts[k] ? 'on' : ''}">\u2713</span>`;
@@ -619,7 +747,7 @@
       });
     } else {
       const opts = {
-        lyrics: ['Tips', 'i-bulb', ['Put [Verse 1] above a part to make a section', 'Drag a line\'s ends to fix where it sits', 'No lyrics? Hear It writes them for you']],
+        lyrics: ['Tips', 'i-bulb', ['Put [Verse 1] above a part to make a section', 'Type [Chorus] again to sing it again', 'No lyrics? Hear It writes them for you']],
         comp: ['Comp Builder', 'i-target', ['Build from the highest-scoring takes', 'Keep the strongest feel & performance', 'Blend joins in the breaths (no clicks)']],
         tighten: ['Suggestions (Optional)', 'i-bulb', ['Tighten doubles (\u221212 ms)', 'Match backing vocal level (+1.5 dB)', 'Line up Guitar Layer 2 with the grid']],
         review: ['What the scores mean', 'i-bulb', ['Pitch: on the notes \u00B7 Timing: on the beat', 'Clarity: words clear \u00B7 Energy: delivery', '\u26A0 a pop, clip or loud breath was heard']],
@@ -635,6 +763,15 @@
   }
   function goAction() {
     if (S.page === 'comp') { setChoice(autoComp(), 'Best performance built from the highest-scoring lines.'); return; }
+    if (S.page === 'lyrics' && Bridge.inHost) {
+      const L = SS.listening;
+      if (!SS.lines.length) return toast('Add your lyrics first: paste them, open a file, or use Hear It.', 4000);
+      if (L.problem) return toast(L.problem, 6000);
+      if (!SS.sungTakes) return toast('Record a take (or add one with +): your lyrics line up as soon as it has been listened to.', 5000);
+      if (L.now || L.waiting) return toast(`Still listening: ${L.now || 'the next take'}${L.now ? ` (${L.percent}%)` : ''}. Lines move into place as each take is done.`, 4000);
+      const found = SS.lines.filter((l) => l.takes > 0).length;
+      return toast(`Lined up: ${found} of ${SS.lines.length} lines found in your takes. It happens by itself whenever lyrics or takes change.`, 5000);
+    }
     const m = { lyrics: ['Lining up lyrics', 'M2'], tighten: ['Tightening and rendering', 'M5'], review: ['Scoring real takes', 'M3'], export: ['Rendering', 'M4'] }[S.page];
     if (m) soon(m[0], m[1]);
   }
@@ -642,6 +779,7 @@
   // ------------------------------------------------------------------ playback (demo: moves the playheads only)
   let raf = 0, lastT = 0, lastRec = 0;
   function play(force) {
+    if (Bridge.inHost) { toast('Use your DAW\u2019s Play: Comp Captain follows it. (Hearing takes from here arrives in M4.)', 4000); return; }
     S.playing = force === true ? true : !S.playing;
     $('#t-play').innerHTML = icon(S.playing ? 'i-pause' : 'i-play');
     if (S.playing) { lastT = performance.now(); raf = requestAnimationFrame(tick); } else cancelAnimationFrame(raf);
@@ -654,33 +792,56 @@
     const ln = D.lines[S.line];
     if (S.loop && S.time > ln.end + 0.3) S.time = ln.start - 0.2;
     if (S.page === 'record') {
-      const sec = D.sections[S.recSection];
-      if (S.time > sec.end) S.time = S.recLoop ? sec.start : sec.end;
+      const sec = SS.sections[S.recSection];
+      if (sec && sec.end > 0 && S.time > sec.end + 1) S.time = S.recLoop ? Math.max(0, sec.start - 1) : sec.end;
     }
     if (S.time >= D.length) { S.time = 0; stop(); }
     // follow the line being sung
-    const cur = D.lines.findIndex((l) => S.time >= l.start - 0.2 && S.time <= l.end + 0.2);
-    if (cur >= 0 && cur !== S.line && !S.loop) { S.line = cur; renderLyricBar(); renderComp(); }
-    else renderLyricBarText();
+    S.following = S.playing;
+    const cur = SG.lineAt(S.time);
+    if (cur >= 0 && cur !== S.sl && !S.loop) { S.sl = cur; S.line = Math.min(D.lines.length - 1, cur); S.recSection = Math.max(0, SG.sectionOf(cur)); renderLyricBar(); renderComp(); if (S.page === 'lyrics') renderLyricsList(); }
+    else markSung();
     movePlayheads();
     if (S.page === 'record' && now - lastRec > 60) { lastRec = now; renderRecordLive(); }
     if (real() && S.page === 'record') T.drawRecord($('#rec-canvas'), $('#rec-bars'));
     if (!Bridge.inHost) { glowLevel = S.playing ? Math.max(0, D.vocalEnvelope(S.time, 222, 0)) : 0; setMeter(glowLevel); }
     if (S.playing) raf = requestAnimationFrame(tick);
   }
-  function renderLyricBarText() {
-    const ln = D.lines[S.line];
-    $$('#line-text span').forEach((s, i) => s.classList.toggle('sung', S.time >= ln.words[i].start && S.time >= ln.start));
-  }
   function renderRecordLive() {
-    let cur = D.lines.findIndex((l) => S.time < l.end); if (cur < 0) cur = D.lines.length - 1;
-    const l = D.lines[cur];
-    $('#p-prev').innerHTML = D.lines[cur - 1] ? D.lines[cur - 1].text : '';
-    $('#p-now').innerHTML = l.words.map((w) => (S.time >= w.start ? `<span class="sung">${w.w}</span>` : w.w)).join(' ');
-    $('#p-next').innerHTML = D.lines[cur + 1] ? D.lines[cur + 1].text : '';
-    fitPrompter();
+    renderPrompter();
     if (S.armed && !real()) drawRecWave();
   }
+
+  // ------------------------------------------------------------------ following the DAW (inside the plug-in)
+  // While the DAW plays, the lit line, its sung words and the teleprompter follow the playhead.
+  let followRaf = 0, lastFollowDraw = 0;
+  function follow(now) {
+    followRaf = 0;
+    const playing = TS.transport.known && TS.transport.playing;
+    S.following = playing && SS.lines.some(SG.timed);
+    if (S.following) {
+      const cur = SG.lineAt(songTime());
+      if (cur >= 0 && cur !== S.sl) {
+        S.sl = cur; S.recSection = Math.max(0, SG.sectionOf(cur));
+        renderLyricBar();
+        if (S.page === 'lyrics') renderLyricsList();
+        if (S.page === 'record') { $('#rec-section').textContent = SS.sections[S.recSection] ? SS.sections[S.recSection].name : ''; renderSectionLists(); }
+      } else markSung();
+      if (now - lastFollowDraw > 50) { lastFollowDraw = now; if (S.page === 'record') renderPrompter(); movePlayheads(); }
+    }
+    if (playing) followRaf = requestAnimationFrame(follow);
+    else if (S.page === 'record') renderPrompter();
+  }
+  function startFollowing() {
+    if (!Bridge.inHost) return;
+    // stopped: the lit line is wherever the playhead was put
+    if (!TS.transport.playing && SS.lines.some(SG.timed)) {
+      const cur = SG.lineAt(songTime());
+      if (cur >= 0 && cur !== S.sl && TS.transport.ppq !== lastStoppedAt) { lastStoppedAt = TS.transport.ppq; setLine(cur, false); }
+    }
+    if (!followRaf) followRaf = requestAnimationFrame(follow);
+  }
+  let lastStoppedAt = null;
   function setMeter(v) {
     const m = $('#rec-meter'); if (!m.children.length) for (let i = 0; i < 14; i++) m.appendChild(h('i', i >= 12 ? 'r' : i >= 9 ? 'y' : ''));
     const lit = Math.round(Math.min(1, v) * 14);
@@ -731,9 +892,14 @@
     $('#line-next').onclick = () => setLine(S.line + 1, true);
     $('#ov-left').onclick = () => setLine(S.line - 1, true);
     $('#ov-right').onclick = () => setLine(S.line + 1, true);
-    $('#overview').onclick = (e) => { const r = e.currentTarget.getBoundingClientRect(); S.time = (e.clientX - r.left) / r.width * D.length; const c = D.lines.findIndex((l) => S.time <= l.end + 0.2); setLine(c < 0 ? D.lines.length - 1 : c, false); };
+    $('#overview').onclick = (e) => {
+      const sp = SG.span(); if (!sp) return;
+      const r = e.currentTarget.getBoundingClientRect(), t = sp[0] + (e.clientX - r.left) / r.width * (sp[1] - sp[0]);
+      if (!Bridge.inHost) S.time = t;
+      const c = SG.lineAt(t); if (c >= 0) setLine(c, false);
+    };
     $('#t-play').onclick = () => play(); $('#t-stop').onclick = stop; $('#bc-play').onclick = () => play();
-    $('#t-start').onclick = () => { S.time = 0; setLine(0, false); };
+    $('#t-start').onclick = () => { if (!Bridge.inHost) S.time = 0; setLine(0, false); };
     $('#t-loop').onclick = (e) => { S.loop = !S.loop; e.currentTarget.classList.toggle('on', S.loop); toast(S.loop ? 'Looping the current line' : 'Loop off'); };
     $('#t-ab').onclick = (e) => { e.currentTarget.classList.toggle('on'); toast(e.currentTarget.classList.contains('on') ? 'Hearing: before' : 'Hearing: after'); };
     $('#t-solo').onclick = (e) => e.currentTarget.classList.toggle('on');
@@ -766,9 +932,14 @@
       S.armed = !S.armed; toast(S.armed ? 'Armed. Press Record in your DAW to start the take.' : 'Disarmed'); renderRecord(); renderFooter();
     };
     $('#r-play').onclick = () => play(); $('#r-stop').onclick = stop;
-    $('#r-start').onclick = () => { S.time = D.sections[S.recSection].start; renderRecord(); movePlayheads(); };
-    $('#rec-sec-prev').onclick = () => { S.recSection = Math.max(0, S.recSection - 1); S.time = D.sections[S.recSection].start; renderRecord(); movePlayheads(); };
-    $('#rec-sec-next').onclick = () => { S.recSection = Math.min(D.sections.length - 1, S.recSection + 1); S.time = D.sections[S.recSection].start; renderRecord(); movePlayheads(); };
+    const goSection = (i) => {
+      if (!SS.sections.length) return toast('Add your lyrics with [Verse 1], [Chorus]\u2026 headings on the Lyrics page to step through sections.', 4000);
+      S.recSection = Math.max(0, Math.min(SS.sections.length - 1, i));
+      setLine(SS.sections[S.recSection].first, true);
+    };
+    $('#r-start').onclick = () => goSection(S.recSection);
+    $('#rec-sec-prev').onclick = () => goSection(S.recSection - 1);
+    $('#rec-sec-next').onclick = () => goSection(S.recSection + 1);
     $('#rec-loop').onclick = () => { S.recLoop = !S.recLoop; renderRecord(); };
     $('#rec-click').onclick = () => { S.recClick = !S.recClick; renderRecord(); };
     const stepTake = (d) => {
@@ -784,21 +955,36 @@
     $('#sv-add').onclick = () => T.addFiles();
     T.wireDrop(stage, $('#drop-hint'));
     // lyrics page
-    $('#lyr-text').value = demoLyricsText();
-    $('#lyr-text').addEventListener('input', renderLyricsList);
+    $('#lyr-text').value = SS.text;
+    $('#lyr-text').addEventListener('input', () => { S.lyrUndo = null; $('#lyr-undo').hidden = true; SG.setText($('#lyr-text').value); });
+    $('#lyr-text').addEventListener('blur', () => SG.setText($('#lyr-text').value, true));
+    $('#lyr-undo').onclick = () => { if (S.lyrUndo == null) return; const t = S.lyrUndo; S.lyrUndo = null; $('#lyr-undo').hidden = true; $('#lyr-text').value = t; SG.setText(t, true); toast('Your lyrics are back.'); };
     $('#lyr-paste').onclick = async () => {
-      try { const t = await navigator.clipboard.readText(); if (t) { $('#lyr-text').value = t; renderLyricsList(); toast('Lyrics pasted'); return; } } catch (e) { /* clipboard blocked */ }
+      try { const t = await navigator.clipboard.readText(); if (t && t.trim()) { replaceLyrics(t, 'Lyrics pasted.'); return; } } catch (e) { /* clipboard blocked */ }
       $('#lyr-text').focus(); toast('Click in the lyrics box and press Ctrl+V (Cmd+V on Mac).');
     };
     const picker = h('input'); picker.type = 'file'; picker.accept = '.txt,.lrc,.docx'; picker.style.display = 'none'; document.body.appendChild(picker);
-    $('#lyr-open').onclick = () => picker.click();
+    $('#lyr-open').onclick = () => (Bridge.inHost ? SG.open() : picker.click());
     picker.onchange = () => {
       const f = picker.files[0]; if (!f) return;
-      if (/\.docx$/i.test(f.name)) { soon('Opening Word files', 'M2'); picker.value = ''; return; }
-      f.text().then((t) => { $('#lyr-text').value = t; renderLyricsList(); toast(`Opened ${f.name}`); picker.value = ''; });
+      if (/\.docx$/i.test(f.name)) { toast('In the plug-in, Word files open too.'); picker.value = ''; return; }
+      f.text().then((t) => { replaceLyrics(t, `Opened ${f.name}.`); picker.value = ''; });
     };
-    $('#lyr-hear').onclick = () => soon('Hear It (lyrics written from your takes)', 'M2');
-    $('#lyr-extras').onclick = (e) => menu(e.currentTarget, ['Song Rider Pro song\u2026', 'Song Savant song\u2026', 'Key Compass song\u2026'], () => soon('Opening songs from your other apps', 'M2'));
+    $('#lyr-hear').onclick = () => {
+      if (!Bridge.inHost) return toast('In the plug-in, Hear It writes the lyrics from your lead take.');
+      const sel = T.selected();
+      SG.hearIt(sel && sel.heard === 'done' ? sel.id : null);
+    };
+    $('#lyr-extras').onclick = (e) => menu(e.currentTarget, ['Song Rider Pro song\u2026', 'Song Savant song\u2026', 'Key Compass song\u2026'], () => soon('Opening songs from your other apps', 'a later update'));
+    T.setLyricsDrop((f) => {
+      f.arrayBuffer().then((buf) => {
+        const bytes = new Uint8Array(buf);
+        let bin = '';
+        for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+        if (Bridge.inHost) SG.sendFile(f.name, btoa(bin));
+        else f.text().then((t) => replaceLyrics(t, `Opened ${f.name}.`));
+      });
+    });
     // tighten
     $$('#layer-tabs button').forEach((b) => { b.onclick = () => { S.tab = b.dataset.tab; renderTighten(); }; });
     $$('#ba-seg button').forEach((b) => { b.onclick = () => { S.ba = b.dataset.ba; renderTighten(); }; });
@@ -847,6 +1033,35 @@
     glowLevel = n; setMeter(n);
   });
 
+  // ------------------------------------------------------------------ lyrics from the plug-in (song.js)
+  Bridge.on('lyricsLoaded', (m) => {
+    if (m.error) { toast(m.error, 6000); return; }
+    replaceLyrics(m.text || '', `Opened ${m.name || 'the file'}.`);
+  });
+  Bridge.on('hearIt', (m) => {
+    if (m.error) { toast(m.error, 6000); return; }
+    const text = m.text || '';
+    if (!$('#lyr-text').value.trim()) { replaceLyrics(text, `Written from ${m.from}. Check the words, then add [Verse 1], [Chorus]\u2026 headings.`); return; }
+    lyricsDialog(`Lyrics heard in ${escapeHtml(m.from || 'your take')}`, 'Put them in place of your lyrics, or add them below?', [
+      { label: 'Cancel' },
+      { label: 'Add below', fn: () => replaceLyrics($('#lyr-text').value.replace(/\s*$/, '\n\n') + text, `Added what was heard in ${m.from}.`) },
+      { label: 'Replace', main: true, fn: () => replaceLyrics(text, `Written from ${m.from}.`) },
+    ]);
+  });
+  let lyricsQueued = false;
+  SG.onChange((what) => {
+    if (what === 'listening') { if (S.page === 'lyrics') { renderLyricsStatus(); renderFooter(); } return; }
+    if (lyricsQueued) return; lyricsQueued = true;
+    requestAnimationFrame(() => {
+      lyricsQueued = false;
+      if (S.sl >= SS.lines.length) S.sl = Math.max(0, SS.lines.length - 1);
+      if (S.recSection >= SS.sections.length) S.recSection = Math.max(0, SS.sections.length - 1);
+      showLyricsText(false);
+      renderLyricBar(); renderLyricsList(); renderRecord(); renderFooter();
+      startFollowing();
+    });
+  });
+
   // ------------------------------------------------------------------ real takes changed (takes.js)
   let realQueued = false;
   function realRedraw() {
@@ -864,16 +1079,18 @@
   T.onChange((what) => {
     if (!real()) return;
     if (what === 'transport') {
+      startFollowing();
       // only the numbers and playheads move
       if (S.page === 'record') {
         const t = TS.transport;
         $('#rec-bpm').textContent = t.known ? String(Math.round(t.bpm * 100) / 100) : '\u2013';
         $('#rec-sig').textContent = t.known ? `${t.num}/${t.den}` : '\u2013/\u2013';
         T.drawRecord($('#rec-canvas'), $('#rec-bars'));
-      } else if (S.page === 'comp' && S.compView === 'song') T.drawLanes($('#lanes'), $('#lane-lyrics'));
+      } else if (S.page === 'comp' && S.compView === 'song') T.drawLanes($('#lanes'), $('#lane-lyrics'), laneBand());
       return;
     }
     if (what === 'report') { if (!$('#settings').hidden) renderSettings(); return; }
+    if (what === 'takes' && S.page === 'lyrics') renderLyricsStatus();
     realRedraw();
   });
 
@@ -883,6 +1100,7 @@
   setTheme(S.theme, false);
   setPage(S.page, false);
   setCompView(S.compView, false);
+  S.sl = Math.min(S.line, Math.max(0, SS.lines.length - 1)); S.recSection = Math.max(0, SG.sectionOf(S.sl));
   renderLyricsList(); renderReview(); renderExport(); renderFooter(); setMeter(0);
   fitStage();
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawCanvases);
