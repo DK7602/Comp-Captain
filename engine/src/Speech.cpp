@@ -229,6 +229,7 @@ namespace cc
         }
         Hearing h;
         h.model = sr.modelName();
+        h.version = hearingVersion;
         if (mono.empty())
             return h;
         h.phrases = findPhrases (mono.data(), mono.size(), info.sampleRate);

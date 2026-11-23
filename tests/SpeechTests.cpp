@@ -84,6 +84,7 @@ TEST_CASE ("A take is read, split into phrases and heard")
     const auto h = cc::hearTake (sr, cc::pathFromUtf8 (std::string (CC_WHISPER_SAMPLES) + "/jfk.wav"), o, error);
     REQUIRE (h.has_value());
     CHECK (h->model == "base.en-q5_1");
+    CHECK (h->version == cc::hearingVersion);
     CHECK (h->phrases.size() >= 3);                // the speech has clear pauses
     CHECK (h->words.size() >= 15);
     CHECK_FALSE (cc::hearTake (sr, "/no/such/take.wav", o, error).has_value());

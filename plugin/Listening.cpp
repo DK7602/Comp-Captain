@@ -156,7 +156,7 @@ void Listening::run()
         // Heard before (and by this model): read it back, no model needed.
         const auto saved = job.again ? std::optional<cc::Hearing> {} : cc::loadHearing (job.file);
         const auto expected = juce::String (Listening::modelFileName).fromFirstOccurrenceOf ("ggml-", false, false).upToLastOccurrenceOf (".bin", false, false);
-        if (saved.has_value() && juce::String (saved->model) == expected)
+        if (saved.has_value() && juce::String (saved->model) == expected && saved->version == cc::hearingVersion)
         {
             r.ok = true;
             r.hearing = std::move (*saved);

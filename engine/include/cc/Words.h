@@ -33,9 +33,13 @@ namespace cc
         std::vector<HeardWord> words;
         std::vector<Phrase> phrases;
         std::string model;        // the speech model that heard it; a different model listens again
+        int version = 0;          // how it was listened to (see hearingVersion); older ones listen again
 
         bool operator== (const Hearing&) const = default;
     };
+
+    // 2: only the sung parts are listened to (0.3.2). Takes heard an older way are listened to again.
+    inline constexpr int hearingVersion = 2;
 
     // Saved next to the take ("Take 3.wav" -> "Take 3.words") as plain text, one word or phrase per line.
     std::string hearingToText (const Hearing&);

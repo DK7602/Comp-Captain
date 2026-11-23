@@ -104,6 +104,7 @@ namespace cc
     {
         std::string out = std::string (hearingHeader) + "\n";
         out += "model=" + text::escape (h.model) + "\n";
+        out += "version=" + std::to_string (h.version) + "\n";
         for (auto& p : h.phrases)
             out += "phrase\t" + text::formatFixed (p.start, 3) + "\t" + text::formatFixed (p.end, 3) + "\n";
         for (auto& w : h.words)
@@ -127,6 +128,13 @@ namespace cc
             if (line.rfind ("model=", 0) == 0)
             {
                 h.model = text::unescape (line.substr (6));
+                continue;
+            }
+            if (line.rfind ("version=", 0) == 0)
+            {
+                std::int64_t v = 0;
+                if (text::parseInt (line.substr (8), v))
+                    h.version = (int) v;
                 continue;
             }
             std::string_view parts[5];

@@ -286,6 +286,7 @@ TEST_CASE ("What was heard is kept next to the take")
     h.words = heard ({ { "Hallelujah,", 1.25 }, { "tab\there", 2.5 } });
     h.phrases = { { 1.2, 2.0 }, { 2.4, 3.1 } };
     h.model = "base.en-q5_1";
+    h.version = cc::hearingVersion;
     REQUIRE (cc::saveHearing (take, h));
     CHECK (cc::hearingFileFor (take).filename() == "Take 1.words");
     const auto back = cc::loadHearing (take);
@@ -297,6 +298,8 @@ TEST_CASE ("What was heard is kept next to the take")
     REQUIRE (back->phrases.size() == 2);
     CHECK (back->phrases[1].end == Approx (3.1));
     CHECK (back->model == "base.en-q5_1");
+    CHECK (back->version == cc::hearingVersion);
+    CHECK (cc::hearingFromText ("compcaptain-words=2\nmodel=base.en-q5_1\n")->version == 0); // heard by 0.3.0/0.3.1
     CHECK_FALSE (cc::loadHearing (dir.path / "Take 2.wav").has_value());
     CHECK_FALSE (cc::hearingFromText ("something else").has_value());
 }
