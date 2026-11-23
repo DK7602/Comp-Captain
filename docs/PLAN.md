@@ -178,8 +178,8 @@ stay sharp on high-resolution screens. The sound-wave glow behind the logo and t
 ### M0 - The look (waits for the owner's graphics)
 Repo, CMake, CI, the full UI shell from the owner's art with made-up takes, light / dark, the manual's outline.
 The plug-in loads in Cubase and passes audio through untouched. Pass: it looks like the art and loads cleanly.
-**Status (2026-11-23):** built; CI green on Windows, macOS and Linux (engine tests + host test). Waiting for the
-owner's test in Cubase.
+**Status (2026-11-23):** done, version 0.1.1. CI green on Windows, macOS and Linux. The owner tested it in Cubase:
+loads clean; their fixes (sharper waveforms, bigger lyrics, Assistant badge backing) are in 0.1.1.
 
 ### M1 - Takes in
 CAPTURE, file drop and the ARA proof. Take list, roles, waveforms placed on the song's bars.

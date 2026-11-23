@@ -4,11 +4,19 @@ Comp Captain is a planned JUCE 8 plug-in and standalone app (VST3, Standalone, A
 line of every vocal take, builds the best comp from them, and tightens doubles, stacks, ad-libs, backing vocals and
 doubled guitars to the lead. **The plan is `docs/PLAN.md`: read it first.**
 
-## Status: M0 (the look)
+## Status (2026-11-23): M0 done, M1 next
 
-- The owner's art is in `art/` and they said go on 2026-11-22. Decisions are in `docs/PLAN.md`, "Decisions after
-  the art". Interface: **web view** (`ui/`), packed into the plug-in.
-- Keep the title, logo, glows and backgrounds exactly as the owner's art; layout and button placement are ours.
+- **M0 (the look) is built: version 0.1.1.** The owner tested it in Cubase: it loads clean. CI is green on Windows, macOS and
+  Linux (20 engine tests + the host test). Their fixes went into 0.1.1: sharper waveforms, bigger lyric text, and a
+  navy backing for the Assistant badge (it looked like it had missing pieces in the light look).
+- The owner cares most about **big lyrics on the Record page** (the teleprompter).
+- Decisions are in `docs/PLAN.md`, "Decisions after the art". Interface: **web view** (`ui/`), packed into the
+  plug-in. Keep the title, logo, glows and backgrounds exactly as the owner's art (`art/`); layout is ours.
+- **Next: M1 (Takes in)**: CAPTURE, file drop, the ARA proof, take list, roles, waveforms on the song's bars.
+  Ask the owner before starting it.
+- **Test vocals:** the owner has dry vocals (theirs and other singers') from earlier plug-in chats, but those
+  files are not reachable from new chats. They'll attach WAVs or share a Drive link from their computer. Needed
+  from M2/M3 on; never commit them to the repo.
 - Work milestone by milestone; each ends with a test in Cubase by the owner.
 
 ## About the owner
