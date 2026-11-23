@@ -1,5 +1,6 @@
 #include "cc/Speech.h"
 
+#include "cc/Resample.h"
 #include "cc/WavFile.h"
 
 #include <whisper.h>
@@ -17,6 +18,7 @@ namespace cc
     struct SpeechRecognizer::Impl
     {
         whisper_context* ctx = nullptr;
+        std::string name;
         ~Impl()
         {
             if (ctx != nullptr)
@@ -28,6 +30,7 @@ namespace cc
     SpeechRecognizer::~SpeechRecognizer() = default;
 
     bool SpeechRecognizer::isLoaded() const noexcept { return impl->ctx != nullptr; }
+    const std::string& SpeechRecognizer::modelName() const noexcept { return impl->name; }
 
     bool SpeechRecognizer::load (const std::filesystem::path& model, std::string& error)
     {
@@ -51,6 +54,9 @@ namespace cc
         if (impl->ctx != nullptr)
             whisper_free (impl->ctx);
         impl->ctx = ctx;
+        impl->name = utf8FromPath (model.stem());
+        if (impl->name.rfind ("ggml-", 0) == 0)
+            impl->name = impl->name.substr (5);
         return true;
     }
 
@@ -129,5 +135,79 @@ namespace cc
             words.push_back (std::move (w));
         }
         return words;
+    }
+
+    std::vector<HeardWord> keepWordsInPhrases (const std::vector<HeardWord>& words, const std::vector<Phrase>& phrases)
+    {
+        if (phrases.empty())
+            return words;
+        constexpr double slack = 0.35; // word times are only good to a few hundredths; breaths are quiet
+        std::vector<HeardWord> out;
+        for (auto& w : words)
+        {
+            const bool inside = std::any_of (phrases.begin(), phrases.end(), [&] (const Phrase& p) {
+                return w.end > p.start - slack && w.start < p.end + slack;
+            });
+            if (inside)
+                out.push_back (w);
+        }
+        return out;
+    }
+
+    std::optional<Hearing> hearTake (SpeechRecognizer& sr, const std::filesystem::path& wav,
+                                     const SpeechRecognizer::Options& options, std::string& error)
+    {
+        if (! sr.isLoaded())
+        {
+            error = "The speech model isn't loaded.";
+            return std::nullopt;
+        }
+        WavReader reader;
+        if (! reader.open (wav))
+        {
+            error = "The take's file couldn't be read: " + utf8FromPath (wav);
+            return std::nullopt;
+        }
+        // the take in mono, a block at a time (a long stereo take never sits in memory twice)
+        const auto& info = reader.info();
+        const int channels = std::max (1, std::min (2, info.channels));
+        std::vector<std::vector<float>> block ((size_t) channels, std::vector<float> (65536));
+        std::vector<float*> ptrs;
+        for (auto& c : block)
+            ptrs.push_back (c.data());
+        std::vector<float> mono;
+        if (info.lengthFrames > 0)
+            mono.reserve ((size_t) info.lengthFrames);
+        int got = 0;
+        while ((got = reader.read (ptrs.data(), channels, 65536)) > 0)
+        {
+            if (options.cancel != nullptr && options.cancel->load())
+                return std::nullopt;
+            for (int i = 0; i < got; ++i)
+            {
+                float v = 0.0f;
+                for (int c = 0; c < channels; ++c)
+                    v += block[(size_t) c][(size_t) i];
+                mono.push_back (v / (float) channels);
+            }
+        }
+        Hearing h;
+        h.model = sr.modelName();
+        if (mono.empty())
+            return h;
+        h.phrases = findPhrases (mono.data(), mono.size(), info.sampleRate);
+        if (h.phrases.empty())
+            return h; // nothing sung
+
+        auto audio = resample (mono, info.sampleRate, SpeechRecognizer::sampleRate);
+        std::vector<float>().swap (mono);
+        auto words = sr.listen (audio.data(), audio.size(), options);
+        if (! words.has_value())
+        {
+            error = (options.cancel != nullptr && options.cancel->load()) ? "Stopped." : "Listening didn't work on this take.";
+            return std::nullopt;
+        }
+        h.words = keepWordsInPhrases (*words, h.phrases);
+        return h;
     }
 }

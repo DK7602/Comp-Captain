@@ -1,6 +1,6 @@
 // Host test: loads "Comp Captain.vst3" like a DAW and checks its promises: it passes audio through
-// untouched, CAPTURE turns a recorded pass into a take on the right bar, and everything is saved
-// with the project.
+// untouched, CAPTURE turns a recorded pass into a take on the right bar, everything is saved with the
+// project, the song's lyrics are shared by every copy, and a sung take is listened to in the background.
 //   CompCaptainHostTest <path to Comp Captain.vst3> [--no-window]
 // Exit code 0 = everything passed.
 
@@ -207,6 +207,105 @@ namespace
     }
 }
 
+namespace
+{
+    // The song's lyrics: every copy of Comp Captain in the project shows and saves the same ones.
+    void lyricsTest (juce::AudioPluginInstance& first, juce::AudioPluginInstance& second)
+    {
+        auto state = componentState (second);
+        check (has (state, "[cc-lyrics]\nstamp="), "saves the song's lyrics with the project");
+        const auto from = state.find ("[cc-lyrics]\n");
+        const auto to = state.find ("[cc-takes]\n");
+        if (from == std::string::npos || to == std::string::npos || to < from)
+            return;
+        const std::string lyrics = "[cc-lyrics]\nstamp=" + std::to_string (juce::Time::currentTimeMillis())
+                                   + "\ntext=[Verse 1]\\nAnd so my fellow Americans\\nask not what your country can do for you\\n\n";
+        state.replace (from, to - from, lyrics);
+        setComponentState (second, state);
+        check (has (componentState (second), "text=[Verse 1]\\nAnd so my fellow Americans"), "restores the song's lyrics");
+        check (has (componentState (first), "text=[Verse 1]\\nAnd so my fellow Americans"), "every copy in the song gets the same lyrics");
+    }
+
+    // Records a few seconds of speech (whisper.cpp's public-domain sample) through CAPTURE and waits for
+    // it to be listened to: the words heard are kept next to the take.
+    void listeningTest (juce::AudioPluginInstance& plugin, const juce::File& takesRoot)
+    {
+#if defined (CC_SPEECH_SAMPLE)
+        juce::AudioFormatManager formats;
+        formats.registerBasicFormats();
+        std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (juce::File (CC_SPEECH_SAMPLE)));
+        check (reader != nullptr, "reads the speech sample");
+        if (reader == nullptr)
+            return;
+        const double rate = reader->sampleRate;
+        juce::AudioBuffer<float> speech (1, (int) reader->lengthInSamples);
+        reader->read (&speech, 0, (int) reader->lengthInSamples, 0, true, false);
+
+        juce::AudioProcessorParameter* capture = nullptr;
+        for (auto* p : plugin.getParameters())
+            if (p->getName (64) == "CAPTURE armed")
+                capture = p;
+        if (capture == nullptr)
+            return;
+        juce::AudioPluginInstance::BusesLayout layout;
+        layout.inputBuses.add (juce::AudioChannelSet::stereo());
+        layout.outputBuses.add (juce::AudioChannelSet::stereo());
+        plugin.setBusesLayout (layout);
+        plugin.setRateAndBufferSizeDetails (rate, 512);
+        plugin.prepareToPlay (rate, 512);
+        FakeTransport daw;
+        daw.rate = rate;
+        plugin.setPlayHead (&daw);
+        juce::MidiBuffer midi;
+        juce::AudioBuffer<float> buffer (2, 512);
+        auto play = [&] (int fromSample, int samples) {
+            for (int done = 0; done < samples; done += 512)
+            {
+                buffer.clear();
+                for (int i = 0; i < 512; ++i)
+                {
+                    const int at = fromSample + done + i;
+                    const float v = at >= 0 && at < speech.getNumSamples() ? speech.getSample (0, at) : 0.0f;
+                    buffer.setSample (0, i, v);
+                    buffer.setSample (1, i, v);
+                }
+                plugin.processBlock (buffer, midi);
+                daw.sample += 512;
+            }
+        };
+        capture->setValueNotifyingHost (1.0f);
+        play (-100000, 2048);
+        juce::MessageManager::getInstance()->runDispatchLoopUntil (300);
+        daw.sample = (juce::int64) (16.0 * rate);               // bar 9
+        daw.recording = true;
+        play (0, speech.getNumSamples());
+        daw.recording = false;
+        play (-100000, 4096);
+        capture->setValueNotifyingHost (0.0f);
+        plugin.setPlayHead (nullptr);
+        plugin.releaseResources();
+
+        // the take is written, then listened to in the background (well within a minute)
+        juce::File words;
+        for (int waited = 0; waited < 120000 && words == juce::File(); waited += 250)
+        {
+            juce::MessageManager::getInstance()->runDispatchLoopUntil (250);
+            const auto found = takesRoot.findChildFiles (juce::File::findFiles, true, "Take 2.words");
+            if (! found.isEmpty())
+                words = found[0];
+        }
+        check (words.existsAsFile(), "a sung take is listened to in the background (\"Take 2.words\" saved next to it)");
+        const auto heard = words.loadFileAsString();
+        check (heard.contains ("model=base.en-q5_1"), "the speech model inside the plug-in was found and used");
+        check (heard.containsIgnoreCase ("country") && heard.containsIgnoreCase ("americans"), "it heard the words that were said");
+        check (heard.contains ("phrase\t"), "it found the sung phrases");
+#else
+        juce::ignoreUnused (plugin, takesRoot);
+        std::cout << "  SKIP  listening (this build has no speech model)" << std::endl;
+#endif
+    }
+}
+
 int main (int argc, char** argv)
 {
     if (argc < 2)
@@ -284,6 +383,10 @@ int main (int argc, char** argv)
 
         setComponentState (*second, "not our state at all");
         check (has (componentState (*second), "theme=light"), "ignores state that isn't ours");
+
+        // 5b. Lyrics belong to the song; sung takes are listened to
+        lyricsTest (*plugin, *second);
+        listeningTest (*plugin, takesRoot);
     }
 
     // 6. Open the window (the web interface), at the saved size, and let it load

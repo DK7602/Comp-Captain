@@ -10,6 +10,11 @@ target_compile_definitions(CompCaptainHostTest PRIVATE
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0)
 
+# With speech in the build, it also records a spoken sample and checks it gets listened to.
+if(CC_WITH_SPEECH AND CC_WHISPER_MODEL)
+    target_compile_definitions(CompCaptainHostTest PRIVATE CC_SPEECH_SAMPLE="${whisper_SOURCE_DIR}/samples/jfk.wav")
+endif()
+
 target_link_libraries(CompCaptainHostTest
     PRIVATE
         juce::juce_audio_formats

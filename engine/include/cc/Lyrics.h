@@ -1,6 +1,8 @@
 // Comp Captain engine: the song's lyrics, as lines grouped in sections.
 // Reads what people actually paste: "[Verse 1]" / "Chorus:" / "(Bridge)" headings, karaoke .lrc time tags,
-// blank lines, and notes like "(x2)" or "*repeat*" that aren't sung words.
+// blank lines, and notes like "(x2)" or "*repeat*" that aren't sung words. A heading on its own that names
+// an earlier section ("[Chorus]" again, with no lines under it) sings that section again; "[Chorus x2]"
+// sings it twice.
 #pragma once
 
 #include <string>
@@ -40,4 +42,8 @@ namespace cc
     // True for a line that's a section heading ("[Chorus]", "Verse 2:", "(Bridge)", "PRE-CHORUS").
     // name gets the heading's name, tidied ("Pre-Chorus").
     bool isSectionHeading (std::string_view line, std::string& name);
+    bool isSectionHeading (std::string_view line, std::string& name, int& times); // "Chorus x2": times = 2
+
+    // The words of a line as they're shown (split at spaces), for lighting them up as they're sung.
+    std::vector<std::string> shownWords (std::string_view line);
 }

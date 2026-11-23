@@ -46,6 +46,13 @@ private:
     void sendNews();
     void takeAction (const juce::var& message);
 
+    // lyrics (shared by the whole song) and listening
+    void sendLyrics (bool force);
+    void sendListening (bool force);
+    void openLyricsFile();
+    void lyricsFromFile (const juce::String& name, const juce::MemoryBlock& bytes);
+    void hearIt (const juce::var& message);
+
     // adding files
     void chooseFiles();
     void importChosen (const juce::var& message);
@@ -66,7 +73,9 @@ private:
     float lastSentPeak = 0.0f;
     int tick = 0;
 
-    juce::uint32 sentTakesVersion = 0, sentAraVersion = 0;
+    juce::uint32 sentTakesVersion = 0, sentAraVersion = 0, sentHearingVersion = 0;
+    juce::uint64 sentSongVersion = 0;
+    juce::String sentListening;
     juce::String sentTracks, sentTransport, sentCapture;
     juce::uint32 liveSerial = 0;
     size_t liveSent = 0;

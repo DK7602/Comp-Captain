@@ -34,23 +34,43 @@ namespace cc
         const auto outLength = (size_t) std::floor ((double) input.size() * ratio);
         const auto n = (long long) input.size();
 
+        // The filter (a windowed sinc) is worked out once, finely, and looked up for each sample.
+        constexpr int perSample = 256;
+        const auto tableHalf = (size_t) std::ceil (halfWidth * perSample) + 2;
+        std::vector<float> table (tableHalf + 1);
+        for (size_t i = 0; i <= tableHalf; ++i)
+        {
+            const double x = (double) i / perSample;
+            if (x > halfWidth)
+            {
+                table[i] = 0.0f;
+                continue;
+            }
+            const double arg = pi * cutoff * x;
+            const double sinc = arg < 1e-9 ? 1.0 : std::sin (arg) / arg;
+            const double w = x / halfWidth;                    // Blackman window, 0 .. 1
+            const double window = 0.42 + 0.5 * std::cos (pi * w) + 0.08 * std::cos (2.0 * pi * w);
+            table[i] = (float) (cutoff * sinc * window);
+        }
+        auto kernel = [&] (double x) {
+            const double at = std::abs (x) * perSample;
+            const auto i = (size_t) at;
+            if (i + 1 > tableHalf)
+                return 0.0f;
+            const float f = (float) (at - (double) i);
+            return table[i] + (table[i + 1] - table[i]) * f;
+        };
+
         std::vector<float> out (outLength);
         for (size_t j = 0; j < outLength; ++j)
         {
             const double t = (double) j / ratio;               // where this output sample sits in the input
-            const auto first = (long long) std::ceil (t - halfWidth);
-            const auto last = (long long) std::floor (t + halfWidth);
-            double sum = 0.0;
-            for (long long k = std::max (0ll, first); k <= std::min (n - 1, last); ++k)
-            {
-                const double x = t - (double) k;
-                const double arg = pi * cutoff * x;
-                const double sinc = std::abs (arg) < 1e-9 ? 1.0 : std::sin (arg) / arg;
-                const double w = x / halfWidth;                // Blackman window, -1 .. 1
-                const double window = 0.42 + 0.5 * std::cos (pi * w) + 0.08 * std::cos (2.0 * pi * w);
-                sum += (double) input[(size_t) k] * cutoff * sinc * window;
-            }
-            out[j] = (float) sum;
+            const auto first = std::max (0ll, (long long) std::ceil (t - halfWidth));
+            const auto last = std::min (n - 1, (long long) std::floor (t + halfWidth));
+            float sum = 0.0f;
+            for (long long k = first; k <= last; ++k)
+                sum += input[(size_t) k] * kernel (t - (double) k);
+            out[j] = sum;
         }
         return out;
     }

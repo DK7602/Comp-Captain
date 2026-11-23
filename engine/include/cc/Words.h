@@ -1,6 +1,8 @@
-// Comp Captain engine: words heard in a take, and keeping them next to the take so a take is only
-// listened to once.
+// Comp Captain engine: what was heard in a take (its words and phrases), kept next to the take so a
+// take is only listened to once.
 #pragma once
+
+#include "cc/Phrases.h"
 
 #include <filesystem>
 #include <optional>
@@ -26,10 +28,19 @@ namespace cc
     // The words of a line of text, plain (see plainWord), empty ones dropped.
     std::vector<std::string> plainWords (std::string_view line);
 
-    // Saved next to the take ("Take 3.wav" -> "Take 3.words") as plain text, one word per line.
-    std::string wordsToText (const std::vector<HeardWord>&);
-    std::vector<HeardWord> wordsFromText (std::string_view);
-    std::filesystem::path wordsFileFor (const std::filesystem::path& takeFile);
-    bool saveWords (const std::filesystem::path& takeFile, const std::vector<HeardWord>&);
-    std::optional<std::vector<HeardWord>> loadWords (const std::filesystem::path& takeFile);
+    struct Hearing
+    {
+        std::vector<HeardWord> words;
+        std::vector<Phrase> phrases;
+        std::string model;        // the speech model that heard it; a different model listens again
+
+        bool operator== (const Hearing&) const = default;
+    };
+
+    // Saved next to the take ("Take 3.wav" -> "Take 3.words") as plain text, one word or phrase per line.
+    std::string hearingToText (const Hearing&);
+    std::optional<Hearing> hearingFromText (std::string_view);
+    std::filesystem::path hearingFileFor (const std::filesystem::path& takeFile);
+    bool saveHearing (const std::filesystem::path& takeFile, const Hearing&);
+    std::optional<Hearing> loadHearing (const std::filesystem::path& takeFile);
 }

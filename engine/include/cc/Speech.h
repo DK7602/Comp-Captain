@@ -29,6 +29,7 @@ namespace cc
         // Loads a whisper model file (ggml format). False (with a plain-words reason) if it can't.
         bool load (const std::filesystem::path& model, std::string& error);
         bool isLoaded() const noexcept;
+        const std::string& modelName() const noexcept; // "base.en-q5_1" for ggml-base.en-q5_1.bin
 
         struct Options
         {
@@ -45,4 +46,13 @@ namespace cc
         struct Impl;
         std::unique_ptr<Impl> impl;
     };
+
+    // Everything about a take that's worked out by listening: reads the take (a WAV file), finds its
+    // phrases, and hears its words (words heard where nobody sings are dropped: the recognizer sometimes
+    // "hears" words in silence). Empty optional if it was stopped or failed (error says why).
+    std::optional<Hearing> hearTake (SpeechRecognizer&, const std::filesystem::path& wav,
+                                     const SpeechRecognizer::Options&, std::string& error);
+
+    // Words that sit outside every phrase (by more than a little) are dropped.
+    std::vector<HeardWord> keepWordsInPhrases (const std::vector<HeardWord>&, const std::vector<Phrase>&);
 }

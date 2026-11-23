@@ -82,6 +82,48 @@ TEST_CASE ("Karaoke .lrc files keep their times")
     CHECK (l.lines[3].lrcTime == Approx (69.5));
 }
 
+TEST_CASE ("A chorus named again sings it again")
+{
+    const auto l = cc::Lyrics::parse (
+        "[Chorus]\n"
+        "I'm alive, I'm alive\n"
+        "singing out with all I am\n"
+        "[Verse 2]\n"
+        "Morning light is breaking through\n"
+        "[Chorus]\n"
+        "\n"
+        "[Tag x2]\n"
+        "You gave me a brand new start\n"
+        "[Bridge]\n");                                 // never written out: dropped
+    REQUIRE (l.sections.size() == 5);
+    CHECK (l.sections[2].name == "Chorus");
+    CHECK (l.sections[2].lineCount == 2);
+    CHECK (l.sections[3].name == "Tag");
+    CHECK (l.sections[4].name == "Tag");                 // x2
+    REQUIRE (l.lines.size() == 7);
+    CHECK (l.lines[3].text == "I'm alive, I'm alive");
+    CHECK (l.lines[3].section == 2);
+    CHECK (l.lines[6].text == "You gave me a brand new start");
+    CHECK (l.lines[6].section == 4);
+
+    std::string name;
+    int times = 0;
+    CHECK (cc::isSectionHeading ("[Chorus x3]", name, times));
+    CHECK (name == "Chorus");
+    CHECK (times == 3);
+    CHECK (cc::isSectionHeading ("Chorus (2x):", name, times));
+    CHECK (name == "Chorus");
+    CHECK (times == 2);
+    CHECK (cc::isSectionHeading ("Verse 2", name, times));
+    CHECK (times == 1);
+}
+
+TEST_CASE ("A line's words as shown")
+{
+    CHECK (cc::shownWords ("  Pre-chorus  time\tnow ") == std::vector<std::string> { "Pre-chorus", "time", "now" });
+    CHECK (cc::shownWords ("").empty());
+}
+
 TEST_CASE ("Words are compared without capitals or punctuation")
 {
     CHECK (cc::plainWord (" Can't,") == "cant");
@@ -90,6 +132,11 @@ TEST_CASE ("Words are compared without capitals or punctuation")
     CHECK (cc::wordLikeness ("love", "love") == 1.0);
     CHECK (cc::wordLikeness ("love", "loves") == Approx (0.8));
     CHECK (cc::wordLikeness ("dark", "start") < 0.5);
+    // curly apostrophes and quotes from a word processor, dashes between words
+    CHECK (cc::plainWord ("don\xE2\x80\x99t") == "dont");
+    CHECK (cc::plainWord ("\xE2\x80\x9CLove\xE2\x80\x9D") == "love");
+    CHECK (cc::plainWords ("free\xE2\x80\x94" "free") == std::vector<std::string> { "free", "free" });
+    CHECK (cc::plainWord ("caf\xC3\xA9") == "caf\xC3\xA9");
 }
 
 namespace
@@ -128,6 +175,31 @@ TEST_CASE ("Lines are placed where their words were heard")
     CHECK (placed[1].line == 1);
     CHECK (placed[1].start == Approx (3.5));
     CHECK (placed[1].end == Approx (5.9));
+    // each shown word has its time
+    REQUIRE (placed[0].words.size() == 6);
+    CHECK (placed[0].words[2].start == Approx (1.6));
+    CHECK (placed[0].words[2].heard);
+}
+
+TEST_CASE ("Words that weren't heard share the time around them")
+{
+    const auto lyrics = cc::Lyrics::parse ("Morning light is breaking through\n");
+    const auto placed = cc::placeLines (lyrics, heard ({ { "Morning", 1.0 }, { "light", 1.4 }, { "through", 2.6 } }));
+    REQUIRE (placed.size() == 1);
+    const auto& w = placed[0].words;
+    REQUIRE (w.size() == 5);
+    CHECK_FALSE (w[2].heard);
+    CHECK (w[2].start == Approx (1.7));                 // "light" ends at 1.7, "through" starts at 2.6
+    CHECK (w[3].start == Approx (2.15));
+    CHECK (w[4].heard);
+
+    // "Pre-chorus" is one shown word made of two plain ones
+    const auto l2 = cc::Lyrics::parse ("the pre-chorus starts\n");
+    const auto p2 = cc::placeLines (l2, heard ({ { "the", 1.0 }, { "pre", 1.3 }, { "chorus", 1.6 }, { "starts", 1.9 } }));
+    REQUIRE (p2.size() == 1);
+    REQUIRE (p2[0].words.size() == 3);
+    CHECK (p2[0].words[1].start == Approx (1.3));
+    CHECK (p2[0].words[1].end == Approx (1.9));
 }
 
 TEST_CASE ("A take of one section finds that section, through misheard words and ad-libs")
@@ -172,18 +244,25 @@ TEST_CASE ("Hear It writes lines at the pauses")
     CHECK (cc::lyricsFromWords (words) == "I was lost\nBut you found me\n");
 }
 
-TEST_CASE ("Heard words are kept next to the take")
+TEST_CASE ("What was heard is kept next to the take")
 {
     cctest::TestFolder dir;
     const auto take = dir.path / "Take 1.wav";
-    const auto words = heard ({ { "Hallelujah,", 1.25 }, { "tab\there", 2.5 } });
-    REQUIRE (cc::saveWords (take, words));
-    CHECK (cc::wordsFileFor (take).filename() == "Take 1.words");
-    const auto back = cc::loadWords (take);
+    cc::Hearing h;
+    h.words = heard ({ { "Hallelujah,", 1.25 }, { "tab\there", 2.5 } });
+    h.phrases = { { 1.2, 2.0 }, { 2.4, 3.1 } };
+    h.model = "base.en-q5_1";
+    REQUIRE (cc::saveHearing (take, h));
+    CHECK (cc::hearingFileFor (take).filename() == "Take 1.words");
+    const auto back = cc::loadHearing (take);
     REQUIRE (back.has_value());
-    REQUIRE (back->size() == 2);
-    CHECK ((*back)[0].text == " Hallelujah,");
-    CHECK ((*back)[0].start == Approx (1.25));
-    CHECK ((*back)[1].text == " tab\there");
-    CHECK_FALSE (cc::loadWords (dir.path / "Take 2.wav").has_value());
+    REQUIRE (back->words.size() == 2);
+    CHECK (back->words[0].text == " Hallelujah,");
+    CHECK (back->words[0].start == Approx (1.25));
+    CHECK (back->words[1].text == " tab\there");
+    REQUIRE (back->phrases.size() == 2);
+    CHECK (back->phrases[1].end == Approx (3.1));
+    CHECK (back->model == "base.en-q5_1");
+    CHECK_FALSE (cc::loadHearing (dir.path / "Take 2.wav").has_value());
+    CHECK_FALSE (cc::hearingFromText ("something else").has_value());
 }

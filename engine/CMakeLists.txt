@@ -2,6 +2,7 @@
 add_library(cc_engine STATIC
     src/Align.cpp
     src/Capture.cpp
+    src/LineUp.cpp
     src/Overview.cpp
     src/Lyrics.cpp
     src/PeakMeter.cpp
@@ -11,6 +12,7 @@ add_library(cc_engine STATIC
     src/SuiteDetector.cpp
     src/Take.cpp
     src/TakesFolder.cpp
+    src/TextFile.cpp
     src/TextFormat.cpp
     src/UiFiles.cpp
     src/UiState.cpp

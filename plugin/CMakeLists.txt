@@ -40,6 +40,7 @@ juce_add_binary_data(CompCaptainUiData SOURCES "${CC_UI_ZIP}")
 target_sources(CompCaptain PRIVATE
     AraSupport.cpp
     AudioImport.cpp
+    Listening.cpp
     PluginProcessor.cpp
     PluginEditor.cpp
     UiResources.cpp)
@@ -65,3 +66,24 @@ target_link_libraries(CompCaptain
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags)
+
+# Speech recognition for lining up lyrics (whisper.cpp, on the computer) and its model, packed inside each
+# plug-in bundle (Contents/Resources) so nothing is downloaded when it runs. The Windows / Linux standalone
+# app gets a Resources folder next to it (and also finds the model inside an installed VST3).
+if(CC_WITH_SPEECH)
+    target_link_libraries(CompCaptain PRIVATE cc_speech)
+    if(CC_WHISPER_MODEL)
+        foreach(format IN LISTS CC_FORMATS)
+            if(format STREQUAL "Standalone" AND NOT APPLE)
+                set(dest "$<TARGET_FILE_DIR:CompCaptain_${format}>/Resources")
+            else()
+                set(dest "$<TARGET_FILE_DIR:CompCaptain_${format}>/../Resources")
+            endif()
+            add_custom_command(TARGET CompCaptain_${format} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory "${dest}"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CC_WHISPER_MODEL}" "${dest}/ggml-base.en-q5_1.bin"
+                COMMENT "Packing the speech model into the ${format} plug-in"
+                VERBATIM)
+        endforeach()
+    endif()
+endif()

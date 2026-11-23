@@ -5,6 +5,7 @@
 #include "cc/Overview.h"
 #include "cc/SuiteDetector.h"
 #include "cc/TakesFolder.h"
+#include "cc/TextFile.h"
 
 namespace
 {
@@ -159,8 +160,9 @@ void CompCaptainEditor::handleUiEvent (const juce::var& message)
     if (type == "ready")
     {
         uiReady = true;
-        sentTakesVersion = sentAraVersion = 0;
-        sentTracks = sentTransport = sentCapture = {};
+        sentTakesVersion = sentAraVersion = sentHearingVersion = 0;
+        sentSongVersion = 0;
+        sentTracks = sentTransport = sentCapture = sentListening = {};
         liveSerial = 0;
         liveSent = 0;
         sendInit();
@@ -223,6 +225,25 @@ void CompCaptainEditor::handleUiEvent (const juce::var& message)
         withViewed ([&] (CompCaptainProcessor& p) { folder = p.takesFolder(); });
         folder.createDirectory();
         folder.startAsProcess();
+    }
+    else if (type == "lyricsSet")
+    {
+        CompCaptainProcessor::setSongLyrics (message.getProperty ("text", {}).toString().substring (0, 200000));
+        sendLyrics (false);
+    }
+    else if (type == "lyricsOpen")
+        openLyricsFile();
+    else if (type == "lyricsFile")
+    {
+        const auto data = cc::fromBase64 (message.getProperty ("data", {}).toString().toStdString());
+        lyricsFromFile (message.getProperty ("name", {}).toString(), juce::MemoryBlock (data.data(), data.size()));
+    }
+    else if (type == "hearIt")
+        hearIt (message);
+    else if (type == "listenAgain")
+    {
+        withViewed ([] (CompCaptainProcessor& p) { p.listenAgain(); });
+        sendListening (true);
     }
     else if (type == "getReport" || type == "copyReport")
     {
@@ -311,6 +332,8 @@ void CompCaptainEditor::sendInit()
     sendTakes();
     sendTransport (true);
     sendCapture (true);
+    sendLyrics (true);
+    sendListening (true);
 }
 
 void CompCaptainEditor::sendTakes()
@@ -320,14 +343,32 @@ void CompCaptainEditor::sendTakes()
     cc::Role role = cc::Role::lead;
     juce::uint32 version = 0;
 
+    juce::uint32 hearingVersion = 0;
     withViewed ([&] (CompCaptainProcessor& p) {
         const auto takes = p.getTakes();
         for (const auto* t : takes.inSongOrder())
-            list.add (takeVar (*t, "t" + juce::String (t->id), p.takeFileMissing (t->id), p.takeOverview (t->id).has_value()));
+        {
+            auto v = takeVar (*t, "t" + juce::String (t->id), p.takeFileMissing (t->id), p.takeOverview (t->id).has_value());
+            if (auto* o = v.getDynamicObject())
+            {
+                // what listening found: its state, how many words, and the sung phrases (take seconds)
+                o->setProperty ("heard", p.takeHearingState (t->id));
+                if (const auto h = p.takeHearing (t->id))
+                {
+                    o->setProperty ("words", (int) h->words.size());
+                    juce::Array<juce::var> phrases;
+                    for (auto& ph : h->phrases)
+                        phrases.add (juce::Array<juce::var> { std::round (ph.start * 100.0) / 100.0, std::round (ph.end * 100.0) / 100.0 });
+                    o->setProperty ("phrases", phrases);
+                }
+            }
+            list.add (v);
+        }
         trackName = p.trackName();
         role = p.trackRole();
         folder = juce::String::fromUTF8 (takes.folder.c_str());
         version = p.takesVersion();
+        hearingVersion = p.hearingVersion();
     });
 
     juce::uint32 araVersion = 0;
@@ -355,6 +396,7 @@ void CompCaptainEditor::sendTakes()
 
     sentTakesVersion = version;
     sentAraVersion = araVersion;
+    sentHearingVersion = hearingVersion;
 
     auto* msg = new juce::DynamicObject();
     msg->setProperty ("takes", list);
@@ -530,17 +572,194 @@ void CompCaptainEditor::timerCallback()
     sendTransport (false);
     sendNews();
 
-    juce::uint32 version = 0;
-    withViewed ([&] (CompCaptainProcessor& p) { version = p.takesVersion(); });
+    juce::uint32 version = 0, hearingVersion = 0;
+    withViewed ([&] (CompCaptainProcessor& p) {
+        version = p.takesVersion();
+        hearingVersion = p.hearingVersion();
+    });
     juce::uint32 araVersion = 0;
 #if JucePlugin_Enable_ARA
     if (auto* doc = processor.araDocument())
         araVersion = doc->version();
 #endif
-    if (version != sentTakesVersion || araVersion != sentAraVersion)
+    if (version != sentTakesVersion || araVersion != sentAraVersion || hearingVersion != sentHearingVersion)
         sendTakes();
+    sendLyrics (false);
+    if (tick % 3 == 0)
+        sendListening (false);
     if (tick % 15 == 0)
         sendTracks (false);
+}
+
+// ============================================================================ lyrics and listening
+
+void CompCaptainEditor::sendLyrics (bool force)
+{
+    const auto song = CompCaptainProcessor::song();
+    if (! force && song->version == sentSongVersion)
+        return;
+    sentSongVersion = song->version;
+
+    const auto round = [] (double v) { return std::round (v * 1000.0) / 1000.0; };
+    juce::Array<juce::var> sections, lines;
+    for (auto& sec : song->lyrics.sections)
+    {
+        auto* o = new juce::DynamicObject();
+        o->setProperty ("name", str (sec.name));
+        o->setProperty ("first", sec.firstLine);
+        o->setProperty ("count", sec.lineCount);
+        sections.add (juce::var (o));
+    }
+    for (size_t i = 0; i < song->lyrics.lines.size(); ++i)
+    {
+        const auto& line = song->lyrics.lines[i];
+        auto* o = new juce::DynamicObject();
+        o->setProperty ("text", str (line.text));
+        o->setProperty ("section", line.section);
+        if (i < song->lineUp.lines.size())
+        {
+            const auto& l = song->lineUp.lines[i];
+            o->setProperty ("start", round (l.start));
+            o->setProperty ("end", round (l.end));
+            o->setProperty ("startQ", round (l.startPpq));
+            o->setProperty ("endQ", round (l.endPpq));
+            o->setProperty ("sure", std::round (l.sure * 100.0f) / 100.0);
+            o->setProperty ("takes", l.takes);
+            if (const auto name = song->takeNames.find (l.from); name != song->takeNames.end())
+                o->setProperty ("from", name->second);
+            juce::Array<juce::var> words;
+            for (auto& w : l.words)
+                words.add (juce::Array<juce::var> { round (w.start), round (w.end), w.heard ? 1 : 0 });
+            o->setProperty ("words", words);
+        }
+        lines.add (juce::var (o));
+    }
+    auto* msg = new juce::DynamicObject();
+    msg->setProperty ("text", song->text);
+    msg->setProperty ("sections", sections);
+    msg->setProperty ("lines", lines);
+    msg->setProperty ("linedUp", song->lineUp.takesLinedUp);
+    msg->setProperty ("sungTakes", song->sungTakes);
+    msg->setProperty ("heardTakes", song->heardTakes);
+    send ("lyrics", msg);
+}
+
+void CompCaptainEditor::sendListening (bool force)
+{
+    const auto st = CompCaptainProcessor::listeningStatus();
+    const auto signature = st.now + "|" + juce::String (st.percent) + "|" + juce::String (st.waiting) + "|"
+                           + juce::String ((int) st.pausedForRecording) + "|" + st.problem;
+    if (! force && signature == sentListening)
+        return;
+    sentListening = signature;
+    auto* msg = new juce::DynamicObject();
+    msg->setProperty ("now", st.now);
+    msg->setProperty ("percent", st.percent);
+    msg->setProperty ("waiting", st.waiting);
+    msg->setProperty ("paused", st.pausedForRecording);
+    msg->setProperty ("problem", st.problem);
+    send ("listening", msg);
+}
+
+void CompCaptainEditor::openLyricsFile()
+{
+    chooser = std::make_unique<juce::FileChooser> ("Open lyrics (.txt, .lrc or Word .docx)", juce::File(), "*.txt;*.lrc;*.docx;*.text");
+    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [this] (const juce::FileChooser& fc) {
+        const auto file = fc.getResult();
+        if (file == juce::File())
+            return;
+        juce::MemoryBlock bytes;
+        if (file.getSize() > 4 * 1024 * 1024 || ! file.loadFileAsData (bytes))
+        {
+            auto* msg = new juce::DynamicObject();
+            msg->setProperty ("error", "That file couldn't be opened as lyrics.");
+            send ("lyricsLoaded", msg);
+            return;
+        }
+        lyricsFromFile (file.getFileName(), bytes);
+    });
+}
+
+void CompCaptainEditor::lyricsFromFile (const juce::String& name, const juce::MemoryBlock& bytes)
+{
+    juce::String text, error;
+    const auto ext = name.fromLastOccurrenceOf (".", false, false).toLowerCase();
+    if (bytes.getSize() > 4 * 1024 * 1024)
+        error = "That file is too big to be lyrics.";
+    else if (ext == "docx")
+    {
+        // a Word file is a zip; the words are in word/document.xml
+        juce::MemoryInputStream in (bytes, false);
+        juce::ZipFile zip (in);
+        if (const auto* entry = zip.getEntry ("word/document.xml"))
+        {
+            std::unique_ptr<juce::InputStream> stream (zip.createStreamForEntry (*entry));
+            juce::MemoryBlock xml;
+            if (stream != nullptr)
+                stream->readIntoMemoryBlock (xml);
+            text = str (cc::textFromWordXml (std::string_view (static_cast<const char*> (xml.getData()), xml.getSize())));
+        }
+        else
+            error = "That Word file couldn't be read. Open it in Word, copy the lyrics, and use Paste.";
+    }
+    else if (ext == "doc")
+        error = "Older Word files (.doc) can't be read. In Word, use Save As > .docx, or copy the lyrics and use Paste.";
+    else if (ext == "pdf" || ext == "rtf" || ext == "pages")
+        error = "That kind of file can't be read. Open it, copy the lyrics, and use Paste.";
+    else
+        text = str (cc::textFromBytes (std::string_view (static_cast<const char*> (bytes.getData()), bytes.getSize())));
+
+    if (error.isEmpty() && text.trim().isEmpty())
+        error = "There were no words in " + name + ".";
+    auto* msg = new juce::DynamicObject();
+    msg->setProperty ("name", name);
+    if (error.isNotEmpty())
+        msg->setProperty ("error", error);
+    else
+    {
+        CompCaptainProcessor::setSongLyrics (text.trim() + "\n");
+        msg->setProperty ("text", text.trim() + "\n");
+    }
+    send ("lyricsLoaded", msg);
+    sendLyrics (false);
+}
+
+void CompCaptainEditor::hearIt (const juce::var& message)
+{
+    // Lyrics written from what was heard: the take asked for, or the lead take with the most words.
+    const auto wanted = ownId (message.getProperty ("id", {}).toString());
+    std::optional<cc::Hearing> best;
+    juce::String from;
+    int waiting = 0;
+    withViewed ([&] (CompCaptainProcessor& p) {
+        const auto takes = p.getTakes();
+        for (const auto* t : takes.inSongOrder())
+        {
+            if (wanted && t->id != *wanted)
+                continue;
+            if (p.takeHearingState (t->id) == "waiting")
+                ++waiting;
+            auto h = p.takeHearing (t->id);
+            if (! h)
+                continue;
+            const bool better = ! best || (t->role == cc::Role::lead && h->words.size() > best->words.size());
+            if (better)
+            {
+                best = std::move (h);
+                from = str (t->name);
+            }
+        }
+    });
+    auto* msg = new juce::DynamicObject();
+    if (best && ! best->words.empty())
+    {
+        msg->setProperty ("text", str (cc::lyricsFromWords (best->words)));
+        msg->setProperty ("from", from);
+    }
+    else
+        msg->setProperty ("error", waiting > 0 ? "Still listening to your takes. Try Hear It again in a moment."
+                                               : "Hear It needs a vocal take to listen to. Record one with CAPTURE, or add a file with +.");
+    send ("hearIt", msg);
 }
 
 // ============================================================================ adding files

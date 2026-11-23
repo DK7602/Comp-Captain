@@ -7,12 +7,14 @@ FetchContent_MakeAvailable(Catch2)
 
 add_executable(cc_tests
     CaptureTests.cpp
+    LineUpTests.cpp
     LyricsTests.cpp
     PeakMeterTests.cpp
     PhrasesTests.cpp
     SongTimeTests.cpp
     SuiteDetectorTests.cpp
     TakeTests.cpp
+    TextFileTests.cpp
     UiFilesTests.cpp
     UiStateTests.cpp
     WavFileTests.cpp

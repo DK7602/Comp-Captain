@@ -70,6 +70,36 @@ TEST_CASE ("Speech recognition hears the words and when they're said")
     CHECK_FALSE (sr.listen (audio.data(), audio.size(), o).has_value());
 }
 
+TEST_CASE ("A take is read, split into phrases and heard")
+{
+    const std::string model = CC_WHISPER_MODEL_PATH;
+    if (model.empty())
+        SKIP ("no model in this build");
+    cc::SpeechRecognizer sr;
+    std::string error;
+    REQUIRE (sr.load (cc::pathFromUtf8 (model), error));
+    CHECK (sr.modelName() == "base.en-q5_1");
+
+    cc::SpeechRecognizer::Options o;
+    const auto h = cc::hearTake (sr, cc::pathFromUtf8 (std::string (CC_WHISPER_SAMPLES) + "/jfk.wav"), o, error);
+    REQUIRE (h.has_value());
+    CHECK (h->model == "base.en-q5_1");
+    CHECK (h->phrases.size() >= 3);                // the speech has clear pauses
+    CHECK (h->words.size() >= 15);
+    CHECK_FALSE (cc::hearTake (sr, "/no/such/take.wav", o, error).has_value());
+    CHECK (error.find ("couldn't be read") != std::string::npos);
+}
+
+TEST_CASE ("Words heard where nobody sings are dropped")
+{
+    const std::vector<cc::HeardWord> words { { " Thank", 0.5, 0.8, 0.5f }, { " you.", 0.8, 1.0, 0.5f },
+                                             { " I", 2.0, 2.2, 0.9f }, { " was", 2.2, 2.5, 0.9f }, { " lost", 4.1, 4.4, 0.9f } };
+    const auto kept = cc::keepWordsInPhrases (words, { { 2.0, 3.0 }, { 4.5, 6.0 } });
+    REQUIRE (kept.size() == 3);                       // "lost" ends just before the second phrase: kept
+    CHECK (kept[0].text == " I");
+    CHECK (cc::keepWordsInPhrases (words, {}).size() == words.size());
+}
+
 TEST_CASE ("A missing model gives a plain reason")
 {
     cc::SpeechRecognizer sr;

@@ -7,6 +7,11 @@
 
 namespace cc
 {
+    namespace
+    {
+        void fillWordTimes (LinePlace&);
+    }
+
     double wordLikeness (const std::string& a, const std::string& b)
     {
         if (a == b)
@@ -28,14 +33,58 @@ namespace cc
         return std::max (0.0, 1.0 - (double) prev[b.size()] / longest);
     }
 
+    namespace
+    {
+    void fillWordTimes (LinePlace& p)
+    {
+        // words that weren't heard share the time between the heard words around them
+        auto& w = p.words;
+        const size_t n = w.size();
+        size_t k = 0;
+        while (k < n)
+        {
+            if (w[k].heard)
+            {
+                ++k;
+                continue;
+            }
+            size_t e = k;
+            while (e < n && ! w[e].heard)
+                ++e;
+            const double from = k > 0 ? w[k - 1].end : p.start;
+            const double to = e < n ? w[e].start : p.end;
+            const double step = std::max (0.0, to - from) / (double) (e - k);
+            for (size_t i = k; i < e; ++i)
+            {
+                w[i].start = from + step * (double) (i - k);
+                w[i].end = w[i].start + step;
+                w[i].heard = false;
+            }
+            k = e;
+        }
+    }
+    }
+
     std::vector<LinePlace> placeLines (const Lyrics& lyrics, const std::vector<HeardWord>& heard)
     {
-        // the lyric words, each knowing its line
-        struct LyricWord { std::string w; int line; };
+        return placeLines (lyrics, heard, 0, (int) lyrics.lines.size() - 1);
+    }
+
+    std::vector<LinePlace> placeLines (const Lyrics& lyrics, const std::vector<HeardWord>& heard, int fromLine, int toLine)
+    {
+        // the lyric words, each knowing its line and which shown word it's part of ("Pre-chorus" is one
+        // shown word but two plain ones)
+        struct LyricWord { std::string w; int line; int shown; };
         std::vector<LyricWord> L;
-        for (size_t li = 0; li < lyrics.lines.size(); ++li)
-            for (auto& w : plainWords (lyrics.lines[li].text))
-                L.push_back ({ w, (int) li });
+        fromLine = std::max (0, fromLine);
+        toLine = std::min ((int) lyrics.lines.size() - 1, toLine);
+        for (int li = fromLine; li <= toLine; ++li)
+        {
+            const auto shown = shownWords (lyrics.lines[(size_t) li].text);
+            for (size_t k = 0; k < shown.size(); ++k)
+                for (auto& w : plainWords (shown[k]))
+                    L.push_back ({ w, li, (int) k });
+        }
         std::vector<std::string> H;
         std::vector<int> heardIndex;
         for (size_t i = 0; i < heard.size(); ++i)
@@ -121,7 +170,8 @@ namespace cc
         {
             LinePlace p;
             p.line = li;
-            int words = 0, found = 0;
+            p.words.resize (shownWords (lyrics.lines[(size_t) li].text).size());
+            int words = 0;
             double sure = 0.0;
             bool any = false;
             for (size_t k = 0; k < n; ++k)
@@ -132,6 +182,11 @@ namespace cc
                 if (matchOf[k] < 0)
                     continue;
                 const auto& hw = heard[(size_t) matchOf[k]];
+                auto& wt = p.words[(size_t) L[k].shown];
+                if (! wt.heard)
+                    wt = { hw.start, hw.end, true };
+                wt.start = std::min (wt.start, hw.start);
+                wt.end = std::max (wt.end, hw.end);
                 if (! any)
                 {
                     p.start = hw.start;
@@ -141,14 +196,13 @@ namespace cc
                 p.start = std::min (p.start, hw.start);
                 p.end = std::max (p.end, hw.end);
                 sure += likeOf[k];
-                ++found;
             }
             if (! any)
             {
                 p.start = p.end = -1.0; // filled in from its neighbours below
             }
             p.sure = words > 0 ? (float) (sure / words) : 0.0f;
-            out.push_back (p);
+            out.push_back (std::move (p));
         }
 
         // lines with no heard words sit between their neighbours
@@ -170,6 +224,8 @@ namespace cc
         for (size_t k = 1; k < out.size(); ++k)
             if (out[k].start < out[k - 1].end)
                 out[k - 1].end = std::max (out[k - 1].start, out[k].start);
+        for (auto& p : out)
+            fillWordTimes (p);
         return out;
     }
 

@@ -4,7 +4,9 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #include "AraSupport.h"
+#include "Listening.h"
 #include "cc/Capture.h"
+#include "cc/LineUp.h"
 #include "cc/PeakMeter.h"
 #include "cc/Take.h"
 #include "cc/UiState.h"
@@ -20,6 +22,8 @@
 //  - Takes from files (WAV, AIFF, FLAC, MP3), placed at a bar.
 //  - The take list (names, roles, hearts), saved with the project.
 //  - ARA: as a Cubase Extension it lists and plays the takes on the track's lanes.
+// M2 adds the song's lyrics (shared by every copy in the project, saved with it), listening to each
+// vocal take in the background (its phrases and words), and lining the lyrics up with the takes.
 class CompCaptainProcessor final : public juce::AudioProcessor,
 #if JucePlugin_Enable_ARA
                                    public juce::AudioProcessorARAExtension,
@@ -145,6 +149,31 @@ public:
     // Tests and power users can move the takes folder (default: Documents/Comp Captain).
     static juce::File takesRoot();
 
+    // ---------------------------------------------------------------- the song (every copy shares it)
+    // The lyrics belong to the song: every Comp Captain in the project shows and saves the same ones.
+    static juce::String songLyrics();
+    static void setSongLyrics (const juce::String& text); // typed, pasted or opened: every copy gets them
+
+    struct Song
+    {
+        juce::uint64 version = 0;
+        juce::String text;
+        cc::Lyrics lyrics;
+        cc::SongLineUp lineUp;
+        std::map<std::uint64_t, juce::String> takeNames; // "Take 3 (Lead Vox)"
+        int sungTakes = 0;                               // vocal takes in the song
+        int heardTakes = 0;                              // ...that have been listened to
+    };
+    // The lyrics and where each line sits (message thread). Worked out again only when something changed.
+    static std::shared_ptr<const Song> song();
+    static Listening::Status listeningStatus();
+
+    // What was heard in this track's takes ("" = not asked yet, "waiting", "done", "failed").
+    juce::String takeHearingState (std::uint32_t id) const;
+    std::optional<cc::Hearing> takeHearing (std::uint32_t id) const;
+    juce::uint32 hearingVersion() const noexcept { return heardChanged.load(); }
+    void listenAgain(); // forget what was heard in this track's takes and listen to them again
+
 private:
     void timerCallback() override;
     int useTimeSlice() override;
@@ -153,6 +182,8 @@ private:
     void scheduleOverviews();
     void changed (bool markProjectDirty = true);
     void addNews (const juce::String& kind, const juce::String& text);
+    void scheduleListening();
+    static void adoptSongLyrics (const std::string& text, juce::int64 stamp);
 
     cc::PeakMeter meter;
     juce::AudioParameterBool* captureParam = nullptr;
@@ -184,6 +215,17 @@ private:
     std::deque<News> news;
 
     std::atomic<juce::uint32> takesChanged { 1 };
+
+    // listening
+    struct TakeHearing
+    {
+        bool asked = false, done = false, failed = false, again = false;
+        cc::Hearing hearing;
+    };
+    juce::SharedResourcePointer<Listening> listening;
+    std::map<std::uint32_t, TakeHearing> hearings;   // under stateLock
+    std::atomic<juce::uint32> heardChanged { 1 };
+    bool wasCapturing = false;
 
     // transport, written by the audio thread
     std::atomic<bool> tKnown { false }, tPlaying { false }, tRecording { false };

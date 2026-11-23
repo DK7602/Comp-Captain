@@ -62,8 +62,41 @@ namespace cc
         }
     }
 
+    namespace
+    {
+        // "x2", "X3", "2x", "(x2)" at the end of a heading: how many times it's sung. Removes it from s.
+        int takeTimes (std::string_view& s)
+        {
+            auto t = text::trim (s);
+            const auto space = t.find_last_of (" \t");
+            auto last = space == std::string_view::npos ? t : t.substr (space + 1);
+            auto bare = last;
+            if (bare.size() >= 2 && bare.front() == '(' && bare.back() == ')')
+                bare = bare.substr (1, bare.size() - 2);
+            std::string_view digits;
+            if (bare.size() >= 2 && (bare.front() == 'x' || bare.front() == 'X'))
+                digits = bare.substr (1);
+            else if (bare.size() >= 2 && (bare.back() == 'x' || bare.back() == 'X'))
+                digits = bare.substr (0, bare.size() - 1);
+            if (digits.empty() || digits.size() > 2 || space == std::string_view::npos)
+                return 1;
+            for (char c : digits)
+                if (! std::isdigit ((unsigned char) c))
+                    return 1;
+            s = text::trim (t.substr (0, space));
+            return std::max (1, std::min (9, std::stoi (std::string (digits))));
+        }
+    }
+
     bool isSectionHeading (std::string_view raw, std::string& name)
     {
+        int times = 1;
+        return isSectionHeading (raw, name, times);
+    }
+
+    bool isSectionHeading (std::string_view raw, std::string& name, int& times)
+    {
+        times = 1;
         auto line = text::trim (raw);
         if (line.empty())
             return false;
@@ -87,21 +120,18 @@ namespace cc
                 return false;
             if (! inner.empty() && inner.back() == ':')
                 inner.remove_suffix (1);
+            times = takeTimes (inner);
             name = titleCase (text::trim (inner));
-            return true;
+            return ! name.empty();
         }
 
         // Verse 1: / CHORUS / Pre-Chorus 2: / Chorus x2 on its own line
         if (line.back() == ':')
             line.remove_suffix (1);
+        times = takeTimes (line);
+        if (! line.empty() && line.back() == ':')
+            line.remove_suffix (1);
         auto w = plainWords (line);
-        auto isTimes = [] (const std::string& x) { return x.size() >= 2 && x[0] == 'x' && std::isdigit ((unsigned char) x[1]); };
-        if (! w.empty() && isTimes (w.back()))
-        {
-            w.pop_back();
-            const auto cut = line.find_last_of ("xX");
-            line = text::trim (line.substr (0, cut));
-        }
         if (w.empty() || w.size() > 3)
             return false;
         std::string joined;
@@ -120,13 +150,37 @@ namespace cc
         return true;
     }
 
+    std::vector<std::string> shownWords (std::string_view line)
+    {
+        std::vector<std::string> out;
+        std::string cur;
+        for (char c : line)
+        {
+            if (c == ' ' || c == '\t' || c == '\r' || c == '\n')
+            {
+                if (! cur.empty())
+                    out.push_back (std::move (cur));
+                cur.clear();
+            }
+            else
+                cur += c;
+        }
+        if (! cur.empty())
+            out.push_back (std::move (cur));
+        return out;
+    }
+
     Lyrics Lyrics::parse (std::string_view text)
     {
         Lyrics out;
+        std::vector<int> timesOf;   // per section: "x2" headings
         double offset = 0.0; // .lrc [offset:+250] is in milliseconds
         auto ensureSection = [&] {
             if (out.sections.empty())
+            {
                 out.sections.push_back ({ "Lyrics", 0, 0 });
+                timesOf.push_back (1);
+            }
         };
 
         while (! text.empty())
@@ -174,9 +228,11 @@ namespace cc
                 continue;
 
             std::string name;
-            if (times.empty() && isSectionHeading (line, name))
+            int repeat = 1;
+            if (times.empty() && isSectionHeading (line, name, repeat))
             {
                 out.sections.push_back ({ name, (int) out.lines.size(), 0 });
+                timesOf.push_back (repeat);
                 continue;
             }
             if (isNote (line))
@@ -196,20 +252,45 @@ namespace cc
             }
         }
 
-        // sections with no lines (a heading at the end, or two headings in a row) are dropped
-        std::vector<LyricSection> kept;
-        std::vector<int> newIndex (out.sections.size(), -1);
+        // Sections in the order they're sung. A heading with no lines under it that names an earlier section
+        // sings that section again; other empty headings (a heading at the end, two in a row) are dropped.
+        // "x2" sings a section twice.
+        auto sameName = [] (const std::string& a, const std::string& b) {
+            return plainWords (a) == plainWords (b);
+        };
+        Lyrics sung;
         for (size_t i = 0; i < out.sections.size(); ++i)
         {
-            if (out.sections[i].lineCount > 0)
+            const auto& sec = out.sections[i];
+            int from = -1;
+            if (sec.lineCount > 0)
+                from = (int) i;
+            else
+                for (size_t k = i; k-- > 0;)
+                    if (out.sections[k].lineCount > 0 && sameName (out.sections[k].name, sec.name))
+                    {
+                        from = (int) k;
+                        break;
+                    }
+            if (from < 0)
+                continue;
+            const auto& src = out.sections[(size_t) from];
+            for (int rep = 0; rep < timesOf[i]; ++rep)
             {
-                newIndex[i] = (int) kept.size();
-                kept.push_back (out.sections[i]);
+                LyricSection s2 { sec.name, (int) sung.lines.size(), src.lineCount };
+                for (int k = 0; k < src.lineCount; ++k)
+                {
+                    auto l = out.lines[(size_t) (src.firstLine + k)];
+                    l.section = (int) sung.sections.size();
+                    if (from != (int) i || rep > 0)
+                        l.lrcTime = -1.0; // a repeat has its own time
+                    sung.lines.push_back (std::move (l));
+                }
+                sung.sections.push_back (std::move (s2));
             }
         }
-        for (auto& l : out.lines)
-            l.section = newIndex[(size_t) l.section];
-        out.sections = std::move (kept);
+        out.sections = std::move (sung.sections);
+        out.lines = std::move (sung.lines);
 
         // .lrc lines can come in any order (repeated choruses list several times on one line)
         bool timed = ! out.lines.empty();

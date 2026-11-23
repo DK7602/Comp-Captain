@@ -11,6 +11,8 @@ namespace cc
     {
         double start = 0.0; // seconds into the take
         double end = 0.0;
+
+        bool operator== (const Phrase&) const = default;
     };
 
     struct PhraseOptions

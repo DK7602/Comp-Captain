@@ -7,12 +7,15 @@
 #include "cc/TextFormat.h"
 #include "cc/WavFile.h"
 
+#include <deque>
+
 namespace
 {
     // Saved projects start with this line so we can recognise (and later upgrade) our own state.
     constexpr const char* stateHeader = "CompCaptainState\n";
     constexpr const char* trackMarker = "[cc-track]\n";
     constexpr const char* takesMarker = "[cc-takes]\n";
+    constexpr const char* lyricsMarker = "[cc-lyrics]\n";
 
     std::atomic<juce::uint64> instanceCounter { 1 };
 
@@ -21,6 +24,13 @@ namespace
     {
         std::recursive_mutex lock; // withTrack() may look at the list again
         std::vector<CompCaptainProcessor*> all;
+        juce::uint32 members = 1;  // counts copies coming and going
+
+        // the song's lyrics (the newest edit wins when a project loads)
+        std::string lyrics;
+        juce::int64 lyricsStamp = 0;
+        juce::uint32 lyricsVersion = 1;
+        std::shared_ptr<const CompCaptainProcessor::Song> song;
 
         static Registry& get()
         {
@@ -66,6 +76,7 @@ struct CompCaptainProcessor::Mailbox
     std::mutex lock;
     std::vector<Imported> imported;
     std::vector<Overview> overviews;
+    std::vector<Listening::Result> heard;
     std::atomic<bool> closed { false };
 };
 
@@ -90,6 +101,7 @@ CompCaptainProcessor::CompCaptainProcessor()
         auto& reg = Registry::get();
         const std::scoped_lock lock (reg.lock);
         reg.all.push_back (this);
+        ++reg.members;
     }
     startTimerHz (10);
 }
@@ -101,8 +113,20 @@ CompCaptainProcessor::~CompCaptainProcessor()
         auto& reg = Registry::get();
         const std::scoped_lock lock (reg.lock);
         reg.all.erase (std::remove (reg.all.begin(), reg.all.end(), this), reg.all.end());
+        ++reg.members;
+        if (reg.all.empty())
+        {
+            // the project closed: the next one starts with its own lyrics
+            reg.lyrics.clear();
+            reg.lyricsStamp = 0;
+            ++reg.lyricsVersion;
+            reg.song.reset();
+        }
     }
     mailbox->closed.store (true);
+    listening->cancelFor (this);
+    if (wasCapturing)
+        listening->recording (false);
     writerThread->removeTimeSliceClient (this);
 }
 
@@ -296,6 +320,13 @@ void CompCaptainProcessor::getStateInformation (juce::MemoryBlock& dest)
         text += std::string ("trackRoleChosen=") + (roleOfTrackChosen ? "1" : "0") + "\n";
         text += std::string ("loopTakes=") + (feed.loopTakes() ? "1" : "0") + "\n";
         text += "seed=" + std::to_string (seed) + "\n";
+        {
+            auto& reg = Registry::get();
+            const std::scoped_lock song (reg.lock);
+            text += lyricsMarker;
+            text += "stamp=" + std::to_string (reg.lyricsStamp) + "\n";
+            text += "text=" + cc::text::escape (reg.lyrics) + "\n";
+        }
         text += takesMarker;
         text += takes.toText();
     }
@@ -311,7 +342,7 @@ void CompCaptainProcessor::setStateInformation (const void* data, int sizeInByte
         return; // not ours: keep the defaults
 
     std::string_view rest = std::string_view (text).substr (std::char_traits<char>::length (stateHeader));
-    std::string_view uiPart = rest, trackPart, takesPart;
+    std::string_view uiPart = rest, trackPart, takesPart, lyricsPart;
     if (const auto t = rest.find (trackMarker); t != std::string_view::npos)
     {
         uiPart = rest.substr (0, t);
@@ -321,6 +352,27 @@ void CompCaptainProcessor::setStateInformation (const void* data, int sizeInByte
             takesPart = trackPart.substr (k + std::char_traits<char>::length (takesMarker));
             trackPart = trackPart.substr (0, k);
         }
+        if (const auto l = trackPart.find (lyricsMarker); l != std::string_view::npos)
+        {
+            lyricsPart = trackPart.substr (l + std::char_traits<char>::length (lyricsMarker));
+            trackPart = trackPart.substr (0, l);
+        }
+    }
+    {
+        std::int64_t stamp = 0;
+        std::string lyricsText;
+        bool hasLyrics = false;
+        cc::text::forEachKeyValue (lyricsPart, [&] (std::string_view key, std::string_view value) {
+            if (key == "stamp")
+                cc::text::parseInt (value, stamp);
+            else if (key == "text")
+            {
+                lyricsText = cc::text::unescape (value);
+                hasLyrics = true;
+            }
+        });
+        if (hasLyrics)
+            adoptSongLyrics (lyricsText, stamp);
     }
 
     bool loop = true;
@@ -345,9 +397,12 @@ void CompCaptainProcessor::setStateInformation (const void* data, int sizeInByte
         overviews.clear();
         missing.clear();
         overviewAsked.clear();
+        hearings.clear();
         destinationKey.clear();
     }
     feed.setLoopTakes (loop);
+    listening->cancelFor (this);
+    heardChanged.fetch_add (1);
     changed (false);
 }
 
@@ -552,12 +607,19 @@ bool CompCaptainProcessor::removeTake (std::uint32_t id)
         {
             const auto bin = folder.getChildFile ("Removed takes");
             bin.createDirectory();
-            moved = file.moveFileTo (bin.getNonexistentChildFile (file.getFileNameWithoutExtension(), file.getFileExtension(), true));
+            const auto dest = bin.getNonexistentChildFile (file.getFileNameWithoutExtension(), file.getFileExtension(), true);
+            moved = file.moveFileTo (dest);
+            // what was heard in it goes along with it
+            const auto words = file.withFileExtension (".words");
+            if (moved && words.existsAsFile())
+                words.moveFileTo (dest.withFileExtension (".words"));
         }
         takes.remove (id);
         overviews.erase (id);
         missing.erase (id);
+        hearings.erase (id);
     }
+    heardChanged.fetch_add (1);
     changed();
     addNews ("info", name + " removed." + (moved ? juce::String (" Its file is in the \"Removed takes\" folder.") : juce::String()));
     return true;
@@ -742,10 +804,35 @@ void CompCaptainProcessor::collectNews()
     // Finished background jobs
     std::vector<Mailbox::Imported> imported;
     std::vector<Mailbox::Overview> pictures;
+    std::vector<Listening::Result> heard;
     {
         const std::scoped_lock lock (mailbox->lock);
         imported.swap (mailbox->imported);
         pictures.swap (mailbox->overviews);
+        heard.swap (mailbox->heard);
+    }
+    if (! heard.empty())
+    {
+        const auto problem = listening->status().problem;
+        for (auto& r : heard)
+        {
+            juce::String name;
+            {
+                const std::scoped_lock lock (stateLock);
+                const auto* t = takes.find (r.takeId);
+                if (t == nullptr || toPath (juce::File (fromStd (takes.folder)).getChildFile (fromStd (t->file))) != r.file)
+                    continue; // removed, or the project was loaded again meanwhile
+                name = fromStd (t->name);
+                auto& h = hearings[r.takeId];
+                h.done = r.ok;
+                h.failed = ! r.ok;
+                h.hearing = std::move (r.hearing);
+            }
+            // a problem with speech itself (no model) shows once in the Lyrics page, not per take
+            if (! r.ok && r.message.isNotEmpty() && r.message != problem)
+                addNews ("failed", "Couldn't listen to " + name + ": " + r.message);
+        }
+        heardChanged.fetch_add (1);
     }
     for (auto& r : imported)
     {
@@ -785,6 +872,176 @@ void CompCaptainProcessor::timerCallback()
     if (captureParam->get()) // armed from the DAW's side (or a test): make sure the writer knows where to save
         updateCaptureDestination();
     scheduleOverviews();
+
+    // listening waits while a take is being recorded
+    const bool capturing = feed.isCapturing();
+    if (capturing != wasCapturing)
+    {
+        listening->recording (capturing);
+        wasCapturing = capturing;
+    }
+    scheduleListening();
+}
+
+// ============================================================================ listening
+
+void CompCaptainProcessor::scheduleListening()
+{
+    std::vector<Listening::Job> todo;
+    {
+        const std::scoped_lock lock (stateLock);
+        const juce::File folder (fromStd (takes.folder));
+        for (auto& t : takes.all())
+        {
+            if (t.source == cc::TakeSource::ara || ! cc::isSung (t.role) || t.file.empty())
+                continue;
+            auto& h = hearings[t.id];
+            if (h.asked)
+                continue;
+            h.asked = true;
+            Listening::Job job;
+            job.owner = this;
+            job.takeId = t.id;
+            job.file = toPath (folder.getChildFile (fromStd (t.file)));
+            job.name = fromStd (t.name) + (track.isNotEmpty() ? " (" + track + ")" : juce::String());
+            job.again = h.again;
+            h.again = false;
+            job.done = [box = mailbox] (Listening::Result&& r) {
+                const std::scoped_lock l (box->lock);
+                if (! box->closed.load())
+                    box->heard.push_back (std::move (r));
+            };
+            todo.push_back (std::move (job));
+        }
+    }
+    for (auto& j : todo)
+        listening->add (std::move (j));
+}
+
+juce::String CompCaptainProcessor::takeHearingState (std::uint32_t id) const
+{
+    const std::scoped_lock lock (stateLock);
+    const auto it = hearings.find (id);
+    if (it == hearings.end() || ! it->second.asked)
+        return {};
+    return it->second.done ? "done" : it->second.failed ? "failed" : "waiting";
+}
+
+std::optional<cc::Hearing> CompCaptainProcessor::takeHearing (std::uint32_t id) const
+{
+    const std::scoped_lock lock (stateLock);
+    const auto it = hearings.find (id);
+    if (it == hearings.end() || ! it->second.done)
+        return std::nullopt;
+    return it->second.hearing;
+}
+
+void CompCaptainProcessor::listenAgain()
+{
+    listening->cancelFor (this);
+    {
+        const std::scoped_lock lock (stateLock);
+        for (auto& [id, h] : hearings)
+        {
+            h = {};
+            h.again = true;
+        }
+    }
+    heardChanged.fetch_add (1);
+}
+
+Listening::Status CompCaptainProcessor::listeningStatus()
+{
+    const juce::SharedResourcePointer<Listening> l;
+    return l->status();
+}
+
+// ============================================================================ the song
+
+juce::String CompCaptainProcessor::songLyrics()
+{
+    auto& reg = Registry::get();
+    const std::scoped_lock lock (reg.lock);
+    return fromStd (reg.lyrics);
+}
+
+void CompCaptainProcessor::setSongLyrics (const juce::String& text)
+{
+    std::vector<CompCaptainProcessor*> everyone;
+    {
+        auto& reg = Registry::get();
+        const std::scoped_lock lock (reg.lock);
+        const auto t = text.toStdString();
+        if (t == reg.lyrics)
+            return;
+        reg.lyrics = t;
+        reg.lyricsStamp = juce::Time::currentTimeMillis();
+        ++reg.lyricsVersion;
+        everyone = reg.all;
+    }
+    // every copy saves the lyrics, so the DAW should ask to save the project
+    for (auto* p : everyone)
+        p->updateHostDisplay (ChangeDetails().withNonParameterStateChanged (true));
+}
+
+void CompCaptainProcessor::adoptSongLyrics (const std::string& text, juce::int64 stamp)
+{
+    // Each copy saved the lyrics as they were when the project was saved; the newest edit wins.
+    auto& reg = Registry::get();
+    const std::scoped_lock lock (reg.lock);
+    if (stamp < reg.lyricsStamp || (stamp == reg.lyricsStamp && text == reg.lyrics))
+        return;
+    reg.lyrics = text;
+    reg.lyricsStamp = stamp;
+    ++reg.lyricsVersion;
+}
+
+std::shared_ptr<const CompCaptainProcessor::Song> CompCaptainProcessor::song()
+{
+    auto& reg = Registry::get();
+    const std::scoped_lock lock (reg.lock);
+    juce::uint64 version = ((juce::uint64) reg.members << 40) + ((juce::uint64) reg.lyricsVersion << 20);
+    for (auto* p : reg.all)
+        version += p->heardChanged.load() + p->takesChanged.load();
+    if (reg.song != nullptr && reg.song->version == version)
+        return reg.song;
+
+    auto s = std::make_shared<Song>();
+    s->version = version;
+    s->text = fromStd (reg.lyrics);
+    s->lyrics = cc::Lyrics::parse (reg.lyrics);
+
+    std::deque<std::vector<cc::HeardWord>> words; // a deque: the pointers below stay put as it grows
+    std::vector<cc::TakeHeard> heard;
+    for (auto* p : reg.all)
+    {
+        const std::scoped_lock state (p->stateLock);
+        for (auto& t : p->takes.all())
+        {
+            if (t.source == cc::TakeSource::ara || ! cc::isSung (t.role))
+                continue;
+            ++s->sungTakes;
+            const auto h = p->hearings.find (t.id);
+            if (h == p->hearings.end() || ! h->second.done)
+                continue;
+            ++s->heardTakes;
+            words.push_back (h->second.hearing.words);
+            cc::TakeHeard th;
+            th.key = (p->uniqueId << 32) | t.id;
+            th.startSeconds = t.start.seconds;
+            th.startPpq = t.start.ppq;
+            th.bpm = t.start.bpm;
+            th.lengthSeconds = t.lengthSeconds();
+            th.role = t.role;
+            th.favourite = t.favourite;
+            th.words = &words.back();
+            heard.push_back (th);
+            s->takeNames[th.key] = fromStd (t.name) + (p->track.isNotEmpty() ? " (" + p->track + ")" : juce::String());
+        }
+    }
+    s->lineUp = cc::lineUpSong (s->lyrics, heard);
+    reg.song = s;
+    return s;
 }
 
 // ============================================================================ all the tracks
