@@ -34,11 +34,32 @@ jobs:
         shell: pwsh
         run: nuget install Microsoft.Web.WebView2 -Version 1.0.1901.177 -OutputDirectory "$env:USERPROFILE\AppData\Local\PackageManagement\NuGet\Packages"
 
+      - name: Speech model (cached between runs)
+        id: model-cache
+        uses: actions/cache@v4
+        with:
+          path: models
+          key: whisper-ggml-base.en-q5_1
+
+      - name: Download the speech model (English, MIT licence)
+        if: steps.model-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          mkdir -p models
+          curl -sSL --retry 4 -o models/ggml-base.en-q5_1.bin \
+            https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en-q5_1.bin
+
+      - name: Check the speech model is the right file
+        shell: bash
+        run: |
+          echo "4baf70dd0d7c4247ba2b81fafd9c01005ac77c2f9ef064e00dcf195d0e2fdd2f  models/ggml-base.en-q5_1.bin" > models/sha256.txt
+          if command -v sha256sum >/dev/null; then sha256sum -c models/sha256.txt; else shasum -a 256 -c models/sha256.txt; fi
+
       - name: Configure
         shell: bash
         run: |
           if [ "$RUNNER_OS" = "Linux" ]; then GEN="-G Ninja"; else GEN=""; fi
-          cmake -S . -B build $GEN -DCMAKE_BUILD_TYPE=Release
+          cmake -S . -B build $GEN -DCMAKE_BUILD_TYPE=Release -DCC_WHISPER_MODEL="$PWD/models/ggml-base.en-q5_1.bin"
 
       - name: Build
         run: cmake --build build --config Release --parallel 4

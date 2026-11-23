@@ -190,7 +190,8 @@ loads clean; their fixes (sharper waveforms, bigger lyrics, Assistant badge back
 ### M1 - Takes in
 CAPTURE, file drop and the ARA proof. Take list, roles, waveforms placed on the song's bars.
 Pass: record 5 takes in Cubase, they all show at the right bar; ARA sees the lane takes (or we learn its limits).
-**Status (2026-11-23):** built, version 0.2.0, waiting for the owner's Cubase test. What's in it:
+**Status (2026-11-23):** done, 0.2.1. The owner tested it in Cubase: arming CAPTURE and recording works. (The ARA
+report from Cubase Artist is still to come; it doesn't block M2.) What's in it:
 - **CAPTURE** (engine `Capture`): armed by the red button (a non-automatable "CAPTURE armed" parameter, never armed
   when a project opens). While armed and the DAW records, the audio thread copies the track's sound into a lock-free
   ring; a shared background thread writes 32-bit float WAVs (header kept current, so a crash keeps the take) to
@@ -223,6 +224,13 @@ Pass: record 5 takes in Cubase, they all show at the right bar; ARA sees the lan
 ### M2 - Lines and lyrics
 Lyrics in (paste / song files), auto line-up with the audio, phrases without lyrics, the teleprompter.
 Pass: on the owner's real takes, lines land within a word of where they belong.
+**Started 2026-11-23 (owner: "let's move forward").** Build order, each step pushed when it works:
+1. Lyrics in: paste / type with `[Verse 1]` headings, open .txt / .lrc / .docx, saved with the project.
+2. Phrases: each take split at its gaps and breaths (works with no lyrics).
+3. Line-up: whisper.cpp (MIT) on the computer, English `base.en` model (~57 MB, MIT weights) shipped inside the
+   plug-in bundle (no download at run time, nothing sent anywhere); word times aligned to the lyric words; Hear It.
+4. Teleprompter: real lyrics following the DAW's position, current line lit, count-in.
+5. From My Songs: Song Rider Pro / Song Savant / Key Compass files (formats read from their repos).
 
 ### M3 - Scores
 The five scores, the Styles, the reasons. Pass: on the owner's sessions, Comp Captain's top pick matches the

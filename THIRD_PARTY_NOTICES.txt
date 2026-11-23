@@ -33,7 +33,14 @@ Comp Captain uses the following outside pieces. Each one's licence allows a paid
 7. MP3 decoding (reading MP3 files) is JUCE's own decoder, under the JUCE licence (item 1).
    The MP3 patents have expired.
 
-8. Catch2 (tests only; not part of the plug-in)
+8. whisper.cpp and ggml (speech recognition, on the computer)
+   Copyright (c) 2023-2026 The ggml authors. MIT licence (full text below).
+
+9. Whisper "base.en" speech model (ggml-base.en-q5_1.bin, packed inside the plug-in)
+   Copyright (c) 2022 OpenAI. MIT licence (the same text as below, with OpenAI's name). Converted to the
+   ggml format by the whisper.cpp project.
+
+10. Catch2 (tests only; not part of the plug-in)
    Boost Software License 1.0.
 
 The Comp Captain logo, title, Assistant badge and backgrounds are the owner's own art.
@@ -373,3 +380,28 @@ PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
 LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+----------------------------------------------------------------------------------------------------
+whisper.cpp / ggml - MIT licence
+----------------------------------------------------------------------------------------------------
+MIT License
+
+Copyright (c) 2023-2026 The ggml authors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

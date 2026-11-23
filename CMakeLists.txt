@@ -17,6 +17,36 @@ endif()
 
 option(CC_BUILD_PLUGIN "Build the JUCE plug-in, standalone app and host test" ON)
 option(CC_BUILD_TESTS "Build the engine tests" ON)
+option(CC_WITH_SPEECH "Speech recognition (whisper.cpp) for lining up lyrics and Hear It" ON)
+set(CC_WHISPER_MODEL "" CACHE FILEPATH "The whisper model to pack into the plug-in (ggml-base.en-q5_1.bin)")
+
+include(FetchContent)
+
+if(CC_WITH_SPEECH)
+    # whisper.cpp (MIT) runs on the CPU only, built to run on any computer of its kind (not just the one
+    # that built it): no OpenMP, Metal, BLAS or extra system libraries. On Windows / Linux it uses AVX2
+    # (the plug-in checks the processor has it before running); a Mac universal build gets plain code.
+    set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
+    set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
+    set(GGML_METAL OFF CACHE BOOL "" FORCE)
+    set(GGML_BLAS OFF CACHE BOOL "" FORCE)
+    set(GGML_ACCELERATE OFF CACHE BOOL "" FORCE)
+    set(GGML_BMI2 OFF CACHE BOOL "" FORCE)
+    set(GGML_AVX512 OFF CACHE BOOL "" FORCE)
+    set(GGML_CCACHE OFF CACHE BOOL "" FORCE)
+    set(GGML_ALL_WARNINGS OFF CACHE BOOL "" FORCE)
+    set(WHISPER_ALL_WARNINGS OFF CACHE BOOL "" FORCE)
+    set(WHISPER_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(WHISPER_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(WHISPER_BUILD_SERVER OFF CACHE BOOL "" FORCE)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    FetchContent_Declare(whisper
+        GIT_REPOSITORY https://github.com/ggml-org/whisper.cpp.git
+        GIT_TAG        v1.9.5
+        GIT_SHALLOW    TRUE)
+    FetchContent_MakeAvailable(whisper)
+endif()
 
 add_subdirectory(engine)
 
@@ -26,7 +56,6 @@ if(CC_BUILD_TESTS)
 endif()
 
 if(CC_BUILD_PLUGIN)
-    include(FetchContent)
     FetchContent_Declare(JUCE
         GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
         GIT_TAG        8.0.15
