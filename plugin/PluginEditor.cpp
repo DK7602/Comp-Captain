@@ -232,7 +232,7 @@ void CompCaptainEditor::handleUiEvent (const juce::var& message)
         sendLyrics (false);
     }
     else if (type == "lyricsOpen")
-        openLyricsFile();
+        openLyricsFile (message.getProperty ("from", {}).toString() == "songrider");
     else if (type == "lyricsFile")
     {
         const auto data = cc::fromBase64 (message.getProperty ("data", {}).toString().toStdString());
@@ -661,9 +661,14 @@ void CompCaptainEditor::sendListening (bool force)
     send ("listening", msg);
 }
 
-void CompCaptainEditor::openLyricsFile()
+void CompCaptainEditor::openLyricsFile (bool songRider)
 {
-    chooser = std::make_unique<juce::FileChooser> ("Open lyrics (.txt, .lrc or Word .docx)", juce::File(), "*.txt;*.lrc;*.docx;*.text");
+    // Song Rider Pro's Export button saves "<Song> - Full Preview (Print).html", usually in Downloads.
+    const auto downloads = juce::File::getSpecialLocation (juce::File::userHomeDirectory).getChildFile ("Downloads");
+    chooser = songRider ? std::make_unique<juce::FileChooser> ("Open a song exported from Song Rider Pro (\"... Full Preview (Print).html\")",
+                                                               downloads.isDirectory() ? downloads : juce::File(), "*.html;*.htm")
+                        : std::make_unique<juce::FileChooser> ("Open lyrics (.txt, .lrc, Word .docx, or a Song Rider Pro page)", juce::File(),
+                                                               "*.txt;*.lrc;*.docx;*.text;*.html;*.htm");
     chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [this] (const juce::FileChooser& fc) {
         const auto file = fc.getResult();
         if (file == juce::File())
@@ -701,6 +706,11 @@ void CompCaptainEditor::lyricsFromFile (const juce::String& name, const juce::Me
         }
         else
             error = "That Word file couldn't be read. Open it in Word, copy the lyrics, and use Paste.";
+    }
+    else if (ext == "html" || ext == "htm")
+    {
+        const auto page = cc::textFromBytes (std::string_view (static_cast<const char*> (bytes.getData()), bytes.getSize()));
+        text = str (cc::textFromSongRiderPage (page));
     }
     else if (ext == "doc")
         error = "Older Word files (.doc) can't be read. In Word, use Save As > .docx, or copy the lyrics and use Paste.";

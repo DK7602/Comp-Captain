@@ -975,7 +975,15 @@
       const sel = T.selected();
       SG.hearIt(sel && sel.heard === 'done' ? sel.id : null);
     };
-    $('#lyr-extras').onclick = (e) => menu(e.currentTarget, ['Song Rider Pro song\u2026', 'Song Savant song\u2026', 'Key Compass song\u2026'], () => soon('Opening songs from your other apps', 'a later update'));
+    $('#lyr-extras').onclick = (e) => menu(e.currentTarget, [
+      { label: 'Song Rider Pro song\u2026', value: 'songrider' },
+      { label: 'Use its Export button first: it saves the song as a page (usually in Downloads)', header: true },
+      { label: 'Song Savant and Key Compass songs hold chords, not words', header: true },
+    ], (it) => {
+      if (it.value !== 'songrider') return;
+      if (!Bridge.inHost) return toast('In the plug-in, this opens a song page exported from Song Rider Pro.');
+      SG.open('songrider');
+    });
     T.setLyricsDrop((f) => {
       f.arrayBuffer().then((buf) => {
         const bytes = new Uint8Array(buf);

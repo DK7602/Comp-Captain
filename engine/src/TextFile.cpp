@@ -1,6 +1,12 @@
 #include "cc/TextFile.h"
 
+#include "cc/TextFormat.h"
+
+#include <algorithm>
+#include <cctype>
 #include <cstdint>
+#include <iterator>
+#include <vector>
 
 namespace cc
 {
@@ -214,5 +220,217 @@ namespace cc
                 out += '\t';
         }
         return out;
+    }
+
+    namespace
+    {
+        bool hasText (std::string_view haystack, std::string_view needle)
+        {
+            // case-insensitive, spaces ignored ("font-weight: 900" == "font-weight:900")
+            std::string a, b;
+            for (char c : haystack)
+                if (c != ' ')
+                    a += (char) std::tolower ((unsigned char) c);
+            for (char c : needle)
+                if (c != ' ')
+                    b += (char) std::tolower ((unsigned char) c);
+            return a.find (b) != std::string::npos;
+        }
+
+        std::string attribute (std::string_view tag, std::string_view name)
+        {
+            // name="value" or name='value'
+            size_t at = 0;
+            while ((at = tag.find (name, at)) != std::string_view::npos)
+            {
+                const bool startsWord = at == 0 || tag[at - 1] == ' ' || tag[at - 1] == '\t' || tag[at - 1] == '\n';
+                size_t k = at + name.size();
+                while (k < tag.size() && tag[k] == ' ')
+                    ++k;
+                if (startsWord && k < tag.size() && tag[k] == '=')
+                {
+                    ++k;
+                    while (k < tag.size() && tag[k] == ' ')
+                        ++k;
+                    if (k < tag.size() && (tag[k] == '"' || tag[k] == '\''))
+                    {
+                        const char q = tag[k];
+                        const auto end = tag.find (q, k + 1);
+                        return std::string (tag.substr (k + 1, end == std::string_view::npos ? std::string_view::npos : end - k - 1));
+                    }
+                }
+                at += name.size();
+            }
+            return {};
+        }
+
+        bool isBlock (std::string_view name)
+        {
+            return name == "div" || name == "p" || name == "tr" || name == "pre" || name == "li" || name == "table"
+                   || name == "h1" || name == "h2" || name == "h3" || name == "h4" || name == "h5" || name == "h6";
+        }
+    }
+
+    std::string textFromSongRiderPage (std::string_view html)
+    {
+        struct Element
+        {
+            std::string name;
+            bool skip = false;     // chords, the title, scripts: not lyrics
+            bool heading = false;  // a section name
+        };
+        std::vector<Element> open;
+        std::string out, heading;
+        int pre = 0;
+        auto skipping = [&] { return ! open.empty() && open.back().skip; };
+        auto inHeading = [&] { for (auto& e : open) if (e.heading) return true; return false; };
+        auto newLine = [&] { if (! out.empty() && out.back() != '\n') out += '\n'; };
+
+        size_t i = 0;
+        while (i < html.size())
+        {
+            const auto lt = html.find ('<', i);
+            const auto textEnd = lt == std::string_view::npos ? html.size() : lt;
+            if (textEnd > i && ! skipping())
+            {
+                std::string text;
+                appendXmlText (text, html.substr (i, textEnd - i));
+                std::string clean;
+                for (size_t k = 0; k < text.size(); ++k)
+                {
+                    if ((unsigned char) text[k] == 0xC2 && k + 1 < text.size() && (unsigned char) text[k + 1] == 0xA0)
+                    {
+                        clean += ' '; // no-break space
+                        ++k;
+                    }
+                    else if (text[k] == '\r')
+                        continue;
+                    else if (text[k] == '\n' && pre == 0)
+                        clean += ' '; // the page's own line breaks are just spaces
+                    else
+                        clean += text[k];
+                }
+                if (text.find ("&nbsp;") != std::string::npos)
+                {
+                    std::string t2;
+                    for (size_t k = 0; k < clean.size(); ++k)
+                    {
+                        if (clean.compare (k, 6, "&nbsp;") == 0) { t2 += ' '; k += 5; }
+                        else t2 += clean[k];
+                    }
+                    clean = t2;
+                }
+                if (inHeading())
+                    heading += clean;
+                else if (pre > 0 || clean.find_first_not_of (' ') != std::string::npos || (! out.empty() && out.back() != '\n'))
+                    out += clean;
+            }
+            if (lt == std::string_view::npos)
+                break;
+            if (html.compare (lt, 4, "<!--") == 0)
+            {
+                const auto end = html.find ("-->", lt);
+                i = end == std::string_view::npos ? html.size() : end + 3;
+                continue;
+            }
+            const auto gt = html.find ('>', lt);
+            if (gt == std::string_view::npos)
+                break;
+            auto tag = html.substr (lt + 1, gt - lt - 1);
+            i = gt + 1;
+            const bool closing = ! tag.empty() && tag.front() == '/';
+            if (closing)
+                tag.remove_prefix (1);
+            const bool selfClosing = ! tag.empty() && tag.back() == '/';
+            const auto nameEnd = tag.find_first_of (" \t\r\n/");
+            std::string name (tag.substr (0, nameEnd));
+            for (auto& c : name)
+                c = (char) std::tolower ((unsigned char) c);
+            if (name.empty() || name[0] == '!' || name[0] == '?')
+                continue;
+
+            if (name == "br")
+            {
+                if (! skipping() && ! inHeading())
+                    out += '\n';
+                continue;
+            }
+            if (name == "meta" || name == "link" || name == "img" || name == "hr" || name == "input")
+                continue;
+
+            if (! closing)
+            {
+                const auto style = attribute (tag, "style");
+                const auto cls = attribute (tag, "class");
+                Element e;
+                e.name = name;
+                e.skip = skipping() || name == "head" || name == "script" || name == "style" || name == "title"
+                         || hasText (style, "color:#c00000")                  // chords are printed in red
+                         || hasText (cls, "srp-export-")                      // the song's title and BPM line
+                         || hasText (style, "font-size:34px");                // the title, older pages
+                e.heading = ! e.skip && name == "div"
+                            && (hasText (style, "text-decoration:underline")
+                                || (hasText (style, "font-weight:900") && hasText (style, "arial")));
+                if (isBlock (name) && ! e.skip)
+                    newLine();
+                if (name == "pre")
+                    ++pre;
+                if (e.heading)
+                    heading.clear();
+                if (! selfClosing)
+                    open.push_back (std::move (e));
+                continue;
+            }
+
+            // closing: find the element (pages aren't always tidy)
+            auto it = std::find_if (open.rbegin(), open.rend(), [&] (const Element& e) { return e.name == name; });
+            if (it == open.rend())
+                continue;
+            const bool wasHeading = it->heading;
+            const bool wasSkip = it->skip;
+            open.erase (std::next (it).base(), open.end());
+            if (name == "pre" && pre > 0)
+                --pre;
+            if (wasHeading && ! inHeading())
+            {
+                std::string h (text::trim (heading));
+                newLine();
+                if (! h.empty())
+                    out += "\n[" + h + "]\n";
+                heading.clear();
+            }
+            else if (isBlock (name) && ! wasSkip)
+                newLine();
+        }
+
+        // tidy: no trailing spaces, no BPM / Capo / Key line, at most one blank line in a row
+        std::string tidy;
+        int blanks = 0;
+        size_t start = 0;
+        while (start <= out.size())
+        {
+            const auto end = out.find ('\n', start);
+            std::string line (out.substr (start, end == std::string::npos ? std::string::npos : end - start));
+            while (! line.empty() && (line.back() == ' ' || line.back() == '\t'))
+                line.pop_back();
+            const auto t = text::trim (line);
+            const bool meta = t.rfind ("BPM:", 0) == 0 || t.rfind ("Capo:", 0) == 0 || t.rfind ("Key:", 0) == 0;
+            if (t.empty())
+            {
+                if (++blanks == 1 && ! tidy.empty())
+                    tidy += '\n';
+            }
+            else if (! meta)
+            {
+                blanks = 0;
+                tidy += line + '\n';
+            }
+            if (end == std::string::npos)
+                break;
+            start = end + 1;
+        }
+        while (tidy.size() >= 2 && tidy[tidy.size() - 1] == '\n' && tidy[tidy.size() - 2] == '\n')
+            tidy.pop_back();
+        return tidy;
     }
 }

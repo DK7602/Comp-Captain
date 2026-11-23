@@ -15,6 +15,11 @@ namespace cc
     // word/document.xml from a .docx -> its text, a line per paragraph (and per line break).
     std::string textFromWordXml (std::string_view documentXml);
 
+    // A song page exported by Song Rider Pro (its Export button: "<Song> - Full Preview (Print).html", old
+    // and new layouts) -> lyrics with "[Section]" headings. Chords (printed in red) and the title / BPM line
+    // are left out. Other web pages come out as their plain text, a line per block.
+    std::string textFromSongRiderPage (std::string_view html);
+
     // True if the bytes are valid UTF-8.
     bool isUtf8 (std::string_view);
 }

@@ -118,6 +118,40 @@ TEST_CASE ("A chorus named again sings it again")
     CHECK (times == 1);
 }
 
+TEST_CASE ("Chord sheets: chord rows and chords in brackets aren't sung")
+{
+    CHECK (cc::isChord ("G"));
+    CHECK (cc::isChord ("D/F#"));
+    CHECK (cc::isChord ("Em7"));
+    CHECK (cc::isChord ("Csus4"));
+    CHECK (cc::isChord ("Bbmaj7"));
+    CHECK (cc::isChord ("F#m7b5"));
+    CHECK (cc::isChord ("(A)"));
+    CHECK_FALSE (cc::isChord ("Be"));
+    CHECK_FALSE (cc::isChord ("Add"));
+    CHECK_FALSE (cc::isChord ("Dim"));
+    CHECK_FALSE (cc::isChord ("I"));
+    CHECK_FALSE (cc::isChord ("Verse"));
+
+    const auto l = cc::Lyrics::parse (
+        "__________VERSE 1\n"
+        "G          D/F#        Em7\n"
+        "I was lost in the dark\n"
+        "[C]but You [G]found me\n"
+        "|  C  |  G  |  x2\n"
+        "__________\n"
+        "__________CHORUS\n"
+        "[G] [D]\n"
+        "Be still and know\n");
+    REQUIRE (l.sections.size() == 2);
+    CHECK (l.sections[0].name == "Verse 1");
+    CHECK (l.sections[1].name == "Chorus");
+    REQUIRE (l.lines.size() == 3);
+    CHECK (l.lines[0].text == "I was lost in the dark");
+    CHECK (l.lines[1].text == "but You found me");
+    CHECK (l.lines[2].text == "Be still and know");
+}
+
 TEST_CASE ("A line's words as shown")
 {
     CHECK (cc::shownWords ("  Pre-chorus  time\tnow ") == std::vector<std::string> { "Pre-chorus", "time", "now" });

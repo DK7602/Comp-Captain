@@ -89,7 +89,11 @@ files (.doc) and PDFs can't be read: open them and copy the words into the box.<
 <li><b>Hear It</b>: no lyrics written down? Comp Captain writes them from your lead take (or the take you picked on the
 Record page). Fix any wrong words, then add the section headings.</li>
 <li>Paste, Open and Hear It replace what's in the box. <b>Undo</b> (top right of the box) brings the old lyrics back.</li>
-<li><b>From My Songs</b> (Song Rider Pro, Song Savant, Key Compass) arrives in a later update.</li>
+<li><b>From My Songs</b>: a song from <b>Song Rider Pro</b>. In Song Rider Pro, press its <b>Export</b> button first:
+it saves the song as a page (<i>Song name &#x2013; Full Preview (Print).html</i>, usually in your Downloads folder).
+Then pick that page here (or drop it on the window). The chords are left out and its sections come along. Song Savant
+and Key Compass songs hold chords and parts but no words, so they can't fill in lyrics.</li>
+<li>Chord sheets pasted from anywhere work too: rows of chords and chords in brackets like <b>[G]</b> are left out.</li>
 </ul>
 <p>The lyrics belong to the song: every Comp Captain in your project shows the same lyrics, and they're saved with the
 project.</p>

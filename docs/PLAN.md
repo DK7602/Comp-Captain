@@ -232,7 +232,7 @@ Pass: on the owner's real takes, lines land within a word of where they belong.
 4. Teleprompter: real lyrics following the DAW's position, current line lit, count-in.
 5. From My Songs: Song Rider Pro / Song Savant / Key Compass files (formats read from their repos).
 
-**M2 status (0.3.0, 2026-11-23): steps 1-4 built; From My Songs next.** What's in it:
+**M2 status (0.3.0, 2026-11-23): all five steps built, waiting for the owner's Cubase test.** What's in it:
 - **Lyrics** (engine `Lyrics`, `TextFile`): headings in every style (`[Verse 1]`, `Chorus:`, `(Bridge)`, `VERSE 2`),
   a heading named again with no lines sings that section again, `[Chorus x2]` twice, notes like `(x2)` / `*repeat*`
   skipped, .lrc times kept. Files: .txt / .lrc in UTF-8, UTF-16 or Windows-1252, Word .docx (the plug-in unzips it,
@@ -258,7 +258,15 @@ Pass: on the owner's real takes, lines land within a word of where they belong.
   Hear It with Replace / Add below), lyric strip on every page (current line, sections on the song's time, overview),
   teleprompter following the DAW (words light up, count-in dots in the two bars before a line), Song view shades the
   current line and shows each take's phrases, take list shows a listened-to dot.
-- Not yet: From My Songs; ARA takes aren't listened to yet (their audio comes through the ARA reader: later);
+- **From My Songs** (engine `textFromSongRiderPage`): only Song Rider Pro keeps lyrics. Its songs live in the
+  browser (localStorage / its cloud), and the one file it writes is the Export button's printable page,
+  `<Song> - Full Preview (Print).html` (usually Downloads). Both layouts are read: newer (sections as tables, heading
+  underlined, lyrics `color:#111`, chords `color:#c00000`, chord-over-lyric as a two-row table cut at each chord)
+  and older (bold heading, each section one `<pre>` with chord rows mixed in). Song Savant (`.songsavant`) and Key
+  Compass (`.kcsong`) songs are XML with chords, BPM, key and section names but no words, so they can't fill lyrics
+  (their BPM / key / sections could feed the Record page later). Chord sheets in general: chord rows and `[G]`
+  inline chords are left out; Song Rider Pro's `__________VERSE 1` break lines are headings.
+- Not yet: ARA takes aren't listened to yet (their audio comes through the ARA reader: later);
   dragging a line's ends by hand (M3/M4, with comping).
 
 ### M3 - Scores

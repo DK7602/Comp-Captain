@@ -13,7 +13,8 @@ doubled guitars to the lead. **The plan is `docs/PLAN.md`: read it first.**
   The owner tested it in Cubase: CAPTURE works. ARA report from Cubase Artist still to come (not blocking).
 - **M2 (lines and lyrics)** built, version 0.3.0: lyrics (paste / .txt / .lrc / .docx, shared by every copy, saved
   with the project), background listening with whisper.cpp (model inside each bundle), lines lined up across takes,
-  teleprompter following the DAW with count-in, Hear It. From My Songs still to do. Details in `docs/PLAN.md`
+  teleprompter following the DAW with count-in, Hear It, From My Songs (Song Rider Pro's exported page; Song
+  Savant / Key Compass hold no lyrics). Details in `docs/PLAN.md`
   (M2 status). `cc_listen <model> <take.wav> [lyrics.txt]` tries listening + lining up on a real take.
 - The owner cares most about **big lyrics on the Record page** (the teleprompter).
 - Decisions are in `docs/PLAN.md`, "Decisions after the art". Interface: **web view** (`ui/`), packed into the

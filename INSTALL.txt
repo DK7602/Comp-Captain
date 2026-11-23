@@ -38,6 +38,7 @@ TRY M2 IN CUBASE (the test for this version)
 5. Play the song in Cubase with the Record page open: the teleprompter follows, the words light up as they're sung,
    and the beats count down before each line.
 6. Try Hear It on a take without lyrics in the box: it writes the words it heard.
+   Or From My Songs: in Song Rider Pro press Export, then pick that page (in Downloads) here.
 7. Save, close and reopen the project: the lyrics are still there, and the lining up comes back straight away.
 8. Still open from M1: the ARA report (select the takes on a track's lanes, Audio > Extensions > Comp Captain,
    then Settings (gear) > Copy next to ARA, and paste it into the chat).

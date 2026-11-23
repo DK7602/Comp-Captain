@@ -128,7 +128,7 @@ const Song = (() => {
   }
 
   // Asking the plug-in for things
-  const open = () => Bridge.send('lyricsOpen', {});
+  const open = (from) => Bridge.send('lyricsOpen', from ? { from } : {});
   const sendFile = (name, b64) => Bridge.send('lyricsFile', { name, data: b64 });
   const hearIt = (id) => Bridge.send('hearIt', id ? { id } : {});
   const listenAgain = () => Bridge.send('listenAgain', {});

@@ -49,7 +49,7 @@ private:
     // lyrics (shared by the whole song) and listening
     void sendLyrics (bool force);
     void sendListening (bool force);
-    void openLyricsFile();
+    void openLyricsFile (bool songRider);
     void lyricsFromFile (const juce::String& name, const juce::MemoryBlock& bytes);
     void hearIt (const juce::var& message);
 

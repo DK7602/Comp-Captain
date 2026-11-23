@@ -88,6 +88,89 @@ namespace cc
         }
     }
 
+    bool isChord (std::string_view w)
+    {
+        if (w.size() >= 2 && w.front() == '(' && w.back() == ')')
+            w = w.substr (1, w.size() - 2);
+        auto root = [] (std::string_view& s) {
+            if (s.empty() || s[0] < 'A' || s[0] > 'G')
+                return false;
+            s.remove_prefix (1);
+            if (! s.empty() && (s[0] == '#' || s[0] == 'b'))
+                s.remove_prefix (1);
+            return true;
+        };
+        if (! root (w))
+            return false;
+        // the chord's kind: m, maj7, sus4, add9, dim, aug, +, b5, #9, 6/9 ...
+        static constexpr std::string_view parts[] = { "maj", "min", "dim", "aug", "sus", "add", "m", "M", "+", "b", "#", "-", "\xC2\xB0" };
+        while (! w.empty() && w[0] != '/')
+        {
+            if (std::isdigit ((unsigned char) w[0]))
+            {
+                w.remove_prefix (1);
+                continue;
+            }
+            bool matched = false;
+            for (auto p : parts)
+                if (w.substr (0, p.size()) == p)
+                {
+                    w.remove_prefix (p.size());
+                    matched = true;
+                    break;
+                }
+            if (! matched)
+                return false;
+        }
+        if (w.empty())
+            return true;
+        w.remove_prefix (1); // a bass note: D/F#
+        return root (w) && w.empty();
+    }
+
+    namespace
+    {
+        // A row of chords over the words ("G    D/F#   Em7  |  C"), as chord sheets have.
+        bool isChordRow (std::string_view line)
+        {
+            int chords = 0;
+            for (auto& w : shownWords (line))
+            {
+                if (isChord (w))
+                    ++chords;
+                else if (! (w == "|" || w == "||" || w == "/" || w == "-" || w == "%" || w == "N.C." || w == "NC" || w == "x2" || w == "x3" || w == "x4"))
+                    return false;
+            }
+            return chords > 0;
+        }
+
+        // "[G]I was [D]lost" -> "I was lost" (brackets holding anything else stay)
+        std::string withoutInlineChords (std::string_view line)
+        {
+            std::string out;
+            size_t i = 0;
+            while (i < line.size())
+            {
+                if (line[i] == '[')
+                {
+                    const auto close = line.find (']', i);
+                    if (close != std::string_view::npos && isChord (line.substr (i + 1, close - i - 1)))
+                    {
+                        i = close + 1;
+                        continue;
+                    }
+                }
+                out += line[i++];
+            }
+            // "I was  lost" after taking a chord out between two words: one space
+            std::string tidy;
+            for (char c : out)
+                if (! (c == ' ' && ! tidy.empty() && tidy.back() == ' '))
+                    tidy += c;
+            return std::string (text::trim (tidy));
+        }
+    }
+
     bool isSectionHeading (std::string_view raw, std::string& name)
     {
         int times = 1;
@@ -227,8 +310,36 @@ namespace cc
             if (line.empty())
                 continue;
 
+            // chord sheets: rows of chords and [G] chords inside a line aren't sung
+            if (times.empty() && isChordRow (line))
+                continue;
+            std::string stripped;
+            if (line.find ('[') != std::string_view::npos)
+            {
+                stripped = withoutInlineChords (line);
+                line = stripped;
+                if (line.empty())
+                    continue;
+            }
+
             std::string name;
             int repeat = 1;
+            // Song Rider Pro's section breaks: "__________VERSE 1"
+            if (times.empty() && line.rfind ("_____", 0) == 0)
+            {
+                auto title = line.substr (line.find_first_not_of ('_') == std::string_view::npos ? line.size() : line.find_first_not_of ('_'));
+                title = text::trim (title);
+                if (title.empty())
+                    continue;
+                if (! isSectionHeading (title, name, repeat))
+                {
+                    repeat = 1;
+                    name = titleCase (title);
+                }
+                out.sections.push_back ({ name, (int) out.lines.size(), 0 });
+                timesOf.push_back (repeat);
+                continue;
+            }
             if (times.empty() && isSectionHeading (line, name, repeat))
             {
                 out.sections.push_back ({ name, (int) out.lines.size(), 0 });

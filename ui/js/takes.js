@@ -443,7 +443,7 @@ const Takes = (() => {
     uploading = false;
   }
   const AUDIO = /\.(wav|wave|aif|aiff|aifc|flac|mp3)$/i;
-  const LYRICS = /\.(txt|text|lrc|docx|doc)$/i;
+  const LYRICS = /\.(txt|text|lrc|docx|doc|html|htm)$/i;
   let lyricsDrop = null;
   const setLyricsDrop = (fn) => { lyricsDrop = fn; };
   function wireDrop(stage, hint) {
@@ -459,7 +459,7 @@ const Takes = (() => {
       const audio = files.filter((f) => AUDIO.test(f.name));
       const lyricFile = files.find((f) => LYRICS.test(f.name));
       if (!audio.length && lyricFile && lyricsDrop) { lyricsDrop(lyricFile); return; }
-      if (!audio.length) { toastFn('Comp Captain takes WAV, AIFF, FLAC and MP3 files (and lyrics as .txt, .lrc or .docx).', 4000); return; }
+      if (!audio.length) { toastFn('Comp Captain takes WAV, AIFF, FLAC and MP3 files (and lyrics as .txt, .lrc, .docx, or a Song Rider Pro page).', 4000); return; }
       if (uploading) { toastFn('Still bringing in the last files. Try again in a moment.'); return; }
       if (audio.length < files.length) toastFn(`${files.length - audio.length} file${files.length - audio.length > 1 ? 's were' : ' was'} skipped (not WAV, AIFF, FLAC or MP3).`, 4000);
       placementDialog({ dropped: audio, files: audio.map((f) => ({ name: f.name.replace(/\.[^.]+$/, ''), guess: guessRole(f.name) })) });
