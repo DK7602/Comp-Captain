@@ -1,7 +1,7 @@
 COMP CAPTAIN - HOW TO INSTALL
 =============================
 
-This version is M2 (0.3.3): takes and lyrics in. Record takes with CAPTURE, add audio files, or bring in the takes
+This version is M2 (0.3.4): takes and lyrics in. Record takes with CAPTURE, add audio files, or bring in the takes
 on a Cubase track's lanes (ARA). Every take lands on its bar. Give it your lyrics and it listens to your takes and
 lines every line up, so the teleprompter follows your song. Scores and comping come next; those parts still show a
 sample song (marked SAMPLE). On your track it passes your audio through untouched.
@@ -35,8 +35,10 @@ TRY M2 IN CUBASE (the test for this version)
 3. Record page: arm the red button and record a take or two of the song (or part of it).
 4. Wait a few seconds after each take: the Lyrics page shows "Listening to Take 1..." and then each line with the
    bar it's sung at. Check: do the lines land where you sang them (within a word)?
-5. Play the song in Cubase with the Record page open: the teleprompter follows, the words light up as they're sung,
-   and the beats count down before each line.
+5. Before the first take is listened to, the words move with the beat: a new line every 2 bars from where you press
+   Play (the Lines button next to 4/4 changes it). After a take is listened to, play the song in Cubase with the
+   Record page open: the teleprompter follows your singing, the words light up, and the beats count down before
+   each line.
 6. Try Hear It on a take without lyrics in the box: it writes the words it heard.
    Or From My Songs: in Song Rider Pro press Export, then pick that page (in Downloads) here.
 7. Save, close and reopen the project: the lyrics are still there, and the lining up comes back straight away.

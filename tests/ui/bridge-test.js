@@ -217,6 +217,31 @@ const { chromium } = require('playwright');
   await p.waitForTimeout(120);
   check((await p.textContent('#p-now')) === 'I\'m alive, I\'m alive', 'stopped: it shows the line where the playhead is');
 
+  // beat scroll: before any take is listened to, the words move on with the beat from where Play was pressed
+  await send({ type: 'transport', known: true, playing: false, recording: false, ppq: 32, seconds: 20, bpm: 400, num: 4, den: 4 });
+  await send({ type: 'listening', now: '', percent: 0, waiting: 0, paused: false, problem: '' });
+  await send({ type: 'lyrics', text: lyricsText, linedUp: 0, sungTakes: 0, heardTakes: 0, unmatched: [],
+    sections: [{ name: 'Verse 1', first: 0, count: 2 }, { name: 'Chorus', first: 2, count: 1 }],
+    lines: [line('I was lost in the dark', 0, -1, -1, { takes: 0 }), line('but You found me', 0, -1, -1, { takes: 0 }), line('I\'m alive, I\'m alive', 1, -1, -1, { takes: 0 })] });
+  await p.click('.nav-btn[data-go="record"]');
+  await p.click('#rec-sec-prev'); await p.click('#rec-sec-prev');
+  await p.waitForTimeout(100);
+  check((await p.textContent('#p-prev')).includes('Before your first take: a new line every 2 bars'), 'before the first take, the teleprompter says the words move with the beat');
+  check((await p.textContent('#rec-scroll-text')) === 'Every 2 bars', 'the Lines button shows 2 bars a line');
+  await send({ type: 'transport', known: true, playing: true, recording: true, ppq: 32, seconds: 20, bpm: 400, num: 4, den: 4 });
+  await p.waitForTimeout(150);
+  check((await p.textContent('#p-now')) === 'I was lost in the dark' && await p.$eval('#p-prev', (e) => !!e.querySelector('.count')), 'pressing Play shows the first line, with the beats counting in');
+  await p.waitForTimeout(1900);   // 400 BPM: a bar of count-in, then 2 bars a line
+  check((await p.textContent('#p-now')) === 'but You found me', 'two bars later the next line comes up');
+  check((await p.textContent('#p-next')) === 'I\'m alive, I\'m alive', 'with the line after it underneath');
+  await send({ type: 'transport', known: true, playing: true, recording: true, ppq: 32, seconds: 20, bpm: 400, num: 4, den: 4 });
+  await p.waitForTimeout(150);
+  check((await p.textContent('#p-now')) === 'I was lost in the dark', 'the loop coming round starts the words again');
+  await send({ type: 'transport', known: true, playing: false, recording: false, ppq: 40, seconds: 21, bpm: 400, num: 4, den: 4 });
+  await p.click('#rec-scroll');
+  await p.click('.menu .menu-item:has-text("4 bars")');
+  check((await p.textContent('#rec-scroll-text')) === 'Every 4 bars', 'the Lines button changes the bars per line');
+
   check(errors.length === 0, 'no script errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
   await b.close();
 })();

@@ -28,19 +28,23 @@
     sl: 0,              // the song's current lyric line (lyric bar, teleprompter, Lyrics page)
     following: false,   // the lit line follows the DAW's playhead
     lyrUndo: null,      // the lyrics before the last Paste / Open / Hear It
+    // Beat scroll: before any take has been listened to, the words move on with the beat
+    beat: { bars: Math.max(1, parseInt(Bridge.localGet('beatBars', '2'), 10) || 2), lead: Math.max(0, parseInt(Bridge.localGet('beatLead', '1'), 10) || 0), anchorQ: null },
+    beatFollow: false,  // the words are moving with the beat right now
+    beatSection: 0,     // beat scroll starts from this section's first line
     choice: [],
     undo: [], redo: [],
     style: 'Worship / Gospel',
     weights: Object.assign({}, D.styles['Worship / Gospel']),
     playing: false, time: 10.5, loop: false,
-    armed: false, recSection: 1, recLoop: true, recClick: true,
+    armed: false, recSection: 1, recLoop: true,
     recOpts: { countIn: true, loopTakes: true, autoNext: true, guide: false },
     tab: 'doubles', ba: 'after',
     layerOn: {}, layerDb: {},
     align: JSON.parse(JSON.stringify(D.alignDefaults)),
     exportOn: {},
     sonicology: { voxology: 'installed', mixology: 'installed' },
-    version: '0.3.3', host: 'Browser preview',
+    version: '0.3.4', host: 'Browser preview',
     level: 0,
   };
   if (!PAGES.includes(S.page)) S.page = 'comp';
@@ -241,7 +245,8 @@
     // record page: through the section
     const sec = SS.sections[S.recSection];
     const f = sec && sec.end > sec.start ? Math.max(0, Math.min(1, (t - sec.start) / (sec.end - sec.start))) : 0;
-    $$('.page[data-page="record"] .prompter .p-head').forEach((e) => { e.style.left = (f * 100) + '%'; });
+    const timedSec = !!sec && sec.start >= 0 && sec.end > sec.start;
+    $$('.page[data-page="record"] .prompter .p-head').forEach((e) => { e.style.left = (f * 100) + '%'; e.style.display = timedSec || !Bridge.inHost ? '' : 'none'; });
   }
   // The current lyric line on the song's bars (for the Song view), or null.
   function laneBand() {
@@ -251,7 +256,7 @@
   function setLine(li, seek) {
     S.sl = Math.max(0, Math.min(SS.lines.length - 1, li));
     const sec = SG.sectionOf(S.sl);
-    if (sec >= 0) S.recSection = sec;
+    if (sec >= 0) { S.recSection = sec; S.beatSection = sec; }
     if (!Bridge.inHost) {
       S.line = Math.max(0, Math.min(D.lines.length - 1, li));
       if (seek && SS.lines[S.sl] && SG.timed(SS.lines[S.sl])) S.time = SS.lines[S.sl].start;
@@ -386,8 +391,8 @@
     const armed = real() ? TS.capture.armed : S.armed;
     $('#r-arm').classList.toggle('armed', armed);
     $('#r-arm').classList.toggle('recording', real() && TS.capture.recording);
-    $('#rec-loop').classList.toggle('on', S.recLoop);
-    $('#rec-click').classList.toggle('on', S.recClick);
+    $('#rec-loop').classList.toggle('on', real() ? TS.capture.loopTakes : S.recLoop);
+    $('#rec-scroll-text').textContent = !Bridge.inHost || SS.lines.some(SG.timed) ? 'Follows you' : `Every ${S.beat.bars} bar${S.beat.bars === 1 ? '' : 's'}`;
     renderPrompter();
     if (real()) { renderRecordReal(); renderSectionLists(); return; }
     // bars and beats across the section (sample song)
@@ -439,33 +444,90 @@
   // before above, the next one below. While the song plays it follows the playhead; with the count-in on,
   // the beats before a line count down where the previous line was.
   function renderPrompter() {
-    const ls = SS.lines, t = songTime();
-    const cur = S.following ? Math.max(0, SG.lineAt(t)) : S.sl;
+    const ls = SS.lines, t = songTime(), q = T.playheadPpq();
+    const cur = S.following ? Math.max(0, SG.lineAt(t)) : (S.beatFollow ? beatLineAt(q) : S.sl);
     const l = ls[cur];
     const words = (x, live) => (!x ? '' : x.shown.map((w, i) => (live && SG.timed(x) && x.words[i] && t >= x.words[i][0] && t >= x.start - 0.05 ? `<span class="sung">${escapeHtml(w)}</span>` : escapeHtml(w))).join(' '));
-    const count = countIn(cur, t);
-    const why = SG.notReady();
+    const count = S.beatFollow ? beatCountIn(cur, q) : countIn(cur, t);
+    const why = prompterNote();
     $('#p-prev').innerHTML = why ? `<span class="p-note">${escapeHtml(why)}</span>` : (count || words(ls[cur - 1], false));
     $('#p-prev').classList.toggle('counting', !!count && !why);
     $('#p-now').innerHTML = l ? words(l, S.following || !Bridge.inHost) : `<span class="dim">${SS.text.trim() ? '' : 'Your lyrics show here'}</span>`;
     $('#p-next').innerHTML = l ? words(ls[cur + 1], false) : `<span class="dim">${SS.text.trim() ? '' : 'Add them on the Lyrics page'}</span>`;
     fitPrompter();
   }
-  // Beats left before line li starts, as lit dots (only in the gap before it, within two bars).
-  function countIn(li, t) {
-    if (!S.recOpts.countIn || !S.following) return '';
-    const l = SS.lines[li];
-    if (!l || !SG.timed(l) || t >= l.start) return '';
-    const tr = TS.transport, bpm = Bridge.inHost ? (+tr.bpm || 120) : D.bpm, den = Bridge.inHost ? (tr.den || 4) : 4, num = Bridge.inHost ? (tr.num || 4) : 4;
-    const beat = 60 / bpm * 4 / den, left = (l.start - t) / beat;
-    const prev = SS.lines[li - 1];
-    if (left > num * 2 || (prev && SG.timed(prev) && t < prev.end + beat * 0.5)) return '';
+  // Glowing dots for the beats left before a line (the bar before it), "Next line in 2 bars" before that.
+  function countDots(left, num) {
     const n = Math.ceil(left - 1e-6);
     if (n > num) return '<span class="count-wait">Next line in 2 bars</span>';
     let dots = '';
     for (let i = num; i >= 1; i--) dots += `<i class="${i >= n ? 'lit' : ''}"></i>`;
     return `<span class="count">${dots}<b>${n}</b></span>`;
   }
+  const meterNow = () => {
+    const tr = TS.transport;
+    return { bpm: Bridge.inHost ? (+tr.bpm || 120) : D.bpm, den: Bridge.inHost ? (tr.den || 4) : 4, num: Bridge.inHost ? (tr.num || 4) : 4 };
+  };
+  // Beats left before line li starts, as lit dots (only in the gap before it, within two bars).
+  function countIn(li, t) {
+    if (!S.recOpts.countIn || !S.following) return '';
+    const l = SS.lines[li];
+    if (!l || !SG.timed(l) || t >= l.start) return '';
+    const m = meterNow(), beat = 60 / m.bpm * 4 / m.den, left = (l.start - t) / beat;
+    const prev = SS.lines[li - 1];
+    if (left > m.num * 2 || (prev && SG.timed(prev) && t < prev.end + beat * 0.5)) return '';
+    return countDots(left, m.num);
+  }
+
+  // ------------------------------------------------------------------ beat scroll (before the first take)
+  // No take has been listened to yet, so the lines have no times: while the DAW plays, the words move on with
+  // the beat instead, a new line every few bars from where you pressed Play, so the next line is always there.
+  // Once a take has been listened to, the words follow your singing instead.
+  const quartersPerBar = () => { const tr = TS.transport; return (tr.num > 0 && tr.den > 0) ? tr.num * 4 / tr.den : 4; };
+  const beatMode = () => Bridge.inHost && SS.lines.length > 0 && !SS.lines.some(SG.timed);
+  const beatFirst = () => { const sec = SS.sections[S.beatSection]; return sec ? sec.first : 0; };
+  function beatStartQ(li) { return S.beat.anchorQ + (S.beat.lead + (li - beatFirst()) * S.beat.bars) * quartersPerBar(); }
+  function beatLineAt(q) {
+    if (S.beat.anchorQ == null) return beatFirst();
+    const k = Math.floor((q - S.beat.anchorQ - S.beat.lead * quartersPerBar()) / (S.beat.bars * quartersPerBar()) + 1e-6);
+    return Math.max(0, Math.min(SS.lines.length - 1, beatFirst() + Math.max(0, k)));
+  }
+  function beatCountIn(li, q) {
+    if (!S.recOpts.countIn || li !== beatFirst() || S.beat.anchorQ == null) return '';
+    const m = meterNow(), left = (beatStartQ(li) - q) / (4 / m.den);
+    if (left <= 0 || left > m.num * 2) return '';
+    return countDots(left, m.num);
+  }
+  // What the space above the big line says while the words can't follow the song yet.
+  function prompterNote() {
+    if (S.following || S.beatFollow) return '';
+    const why = SG.notReady();
+    if (!why) return '';
+    const L = SS.listening;
+    if (beatMode() && !L.now && !L.problem && !(SS.heardTakes && !SS.linedUp)) {
+      const bars = S.beat.bars === 1 ? 'every bar' : `every ${S.beat.bars} bars`;
+      const from = S.beat.lead === 0 ? 'from the bar you press Play' : `starting ${S.beat.lead === 1 ? '1 bar' : S.beat.lead + ' bars'} after you press Play`;
+      return `Before your first take: a new line ${bars}, ${from}. Once a take is listened to, the words follow your singing.`;
+    }
+    return why;
+  }
+  // The Lines button (Record page): how the words move before a take has been listened to.
+  function beatMenu(anchor) {
+    const following = SS.lines.some(SG.timed);
+    const items = [];
+    if (following) items.push({ label: 'Now following your singing (a take was listened to)', header: true });
+    items.push({ label: 'Before a take is listened to, a new line every:', header: true });
+    [1, 2, 4].forEach((b) => items.push({ label: b === 1 ? '1 bar' : `${b} bars`, value: 'bars:' + b, checked: S.beat.bars === b }));
+    items.push({ label: 'The first line comes in:', header: true });
+    [[0, 'On the bar you press Play'], [1, '1 bar after you press Play'], [2, '2 bars after you press Play']].forEach(([v, label]) => items.push({ label, value: 'lead:' + v, checked: S.beat.lead === v }));
+    menu(anchor, items, (it) => {
+      const [k, v] = it.value.split(':');
+      if (k === 'bars') { S.beat.bars = +v; Bridge.localSet('beatBars', v); }
+      if (k === 'lead') { S.beat.lead = +v; Bridge.localSet('beatLead', v); }
+      renderRecord();
+    });
+  }
+
   // Long lines shrink so they always fit across the teleprompter.
   function fitPrompter() {
     [['#p-prev', 56], ['#p-now', 80], ['#p-next', 56]].forEach(([id, size]) => {
@@ -823,8 +885,9 @@
     followRaf = 0;
     const playing = TS.transport.known && TS.transport.playing;
     S.following = playing && SS.lines.some(SG.timed);
-    if (S.following) {
-      const cur = SG.lineAt(songTime());
+    S.beatFollow = playing && beatMode() && S.beat.anchorQ != null;
+    if (S.following || S.beatFollow) {
+      const cur = S.following ? SG.lineAt(songTime()) : beatLineAt(T.playheadPpq());
       if (cur >= 0 && cur !== S.sl) {
         S.sl = cur; S.recSection = Math.max(0, SG.sectionOf(cur));
         renderLyricBar();
@@ -838,6 +901,17 @@
   }
   function startFollowing() {
     if (!Bridge.inHost) return;
+    // beat scroll: playing from a new place (pressed Play, the loop came round, or you clicked elsewhere)
+    // starts the words again from the chosen section, on that bar
+    const tr = TS.transport;
+    if (tr.playing && tr.known) {
+      const expected = lastTransport && lastTransport.playing ? lastTransport.ppq + (tr.at - lastTransport.at) / 1000 * (+tr.bpm || 120) / 60 : null;
+      if (expected == null || Math.abs(tr.ppq - expected) > 1.0 || S.beat.anchorQ == null) {
+        const qpb = quartersPerBar();
+        S.beat.anchorQ = Math.floor(tr.ppq / qpb + 1e-6) * qpb;
+      }
+    } else S.beat.anchorQ = null;
+    lastTransport = { ppq: tr.ppq, at: tr.at, playing: tr.playing && tr.known };
     // stopped: the lit line is wherever the playhead was put
     if (!TS.transport.playing && SS.lines.some(SG.timed)) {
       const cur = SG.lineAt(songTime());
@@ -845,7 +919,7 @@
     }
     if (!followRaf) followRaf = requestAnimationFrame(follow);
   }
-  let lastStoppedAt = null;
+  let lastStoppedAt = null, lastTransport = null;
   function setMeter(v) {
     const m = $('#rec-meter'); if (!m.children.length) for (let i = 0; i < 14; i++) m.appendChild(h('i', i >= 12 ? 'r' : i >= 9 ? 'y' : ''));
     const lit = Math.round(Math.min(1, v) * 14);
@@ -947,8 +1021,11 @@
     $('#r-start').onclick = () => goSection(S.recSection);
     $('#rec-sec-prev').onclick = () => goSection(S.recSection - 1);
     $('#rec-sec-next').onclick = () => goSection(S.recSection + 1);
-    $('#rec-loop').onclick = () => { S.recLoop = !S.recLoop; renderRecord(); };
-    $('#rec-click').onclick = () => { S.recClick = !S.recClick; renderRecord(); };
+    $('#rec-loop').onclick = () => {
+      if (real()) { const on = !TS.capture.loopTakes; T.setLoopTakes(on); toast(on ? 'Loop Takes on: each time your DAW\u2019s loop comes round, a new take.' : 'Loop Takes off: only the first pass is kept.'); return; }
+      S.recLoop = !S.recLoop; renderRecord();
+    };
+    $('#rec-scroll').onclick = (e) => beatMenu(e.currentTarget);
     const stepTake = (d) => {
       if (!real()) return toast('Takes are counted for you as you record.');
       if (!TS.list.length) return;

@@ -122,9 +122,16 @@ each take in the Comp page's Song view).</p>
 line before and the next line sit above and below. The section box and the lyric strip on the other pages follow
 along. With <b>Count-in on screen</b> on (bottom of the Record page), the beats before a line count down as glowing
 dots. When your DAW is stopped, it shows the line where the playhead is; the arrows step through the sections.</p>
-<p>The teleprompter follows once a take has been listened to (that's how it knows where the lines are). For a brand
-new song, record a first take, and from the second take on the words follow you. Until then, the space above the big
-line says what it's waiting for (for example "Listening to Take 1... 40%").</p>
+<p><b>Before your first take</b> (nothing listened to yet, so Comp Captain doesn't know where the lines go), the words
+move with the beat instead: when you press Play, a new line comes up every 2 bars, so the next line is always in
+front of you. The <b>Lines</b> button on the Record page (next to 4/4) sets how many bars each line gets (1, 2 or 4)
+and when the first line comes in (on the bar you press Play, or 1 or 2 bars after it, with the beats counting
+down). The arrows next to the section name pick where the words start (Verse 1, Chorus...). If you loop a part, the
+words start again each time round.</p>
+<p><b>After a take has been listened to</b>, the words follow your singing instead: each line comes up when you
+sang it, and the words light up as you go. The space above the big line says what it's doing (for example
+"Listening to Take 1... 40%"). The <b>Loop</b> button there is Loop Takes (a new take each time the loop comes
+round).</p>
 <p>Words not following? Open <b>&#x2699; Settings</b> and click <b>Copy</b> next to <b>Lyrics &amp; listening</b>: it
 copies a plain report of what Comp Captain heard in your takes and where each line landed. Paste it into the chat.</p>
 

@@ -281,6 +281,13 @@ Pass: on the owner's real takes, lines land within a word of where they belong.
   take's `.words` file). A take with sound but no phrases found is now listened to whole (it used to be skipped as
   "nothing sung"); Lyrics Status shows what a take that didn't match heard ("Take 1 heard: ..."), so the owner can
   see it. Takes heard by older versions are listened to again (hearing version 3).
+- 0.3.4 (owner: "have the lyrics autoscroll on the beat for the first take, then smart scroll after it's listened
+  to; I keep forgetting my 3rd line"): **beat scroll**. While no line has a time, playing moves the words on with the
+  beat: line k of the chosen section starts at (bar where Play was pressed) + lead + k x bars-per-line. The Lines
+  button (Record page, the metronome) sets bars per line (1 / 2 / 4, default 2) and the lead (0 / 1 / 2 bars,
+  default 1, with the count-in dots); kept in the web view's local storage. A jump in the playhead (loop, click)
+  starts again. Once any line has a time, the teleprompter follows the singing as before. The Record page's Loop
+  button is now Loop Takes.
 - Not yet: ARA takes aren't listened to yet (their audio comes through the ARA reader: later);
   dragging a line's ends by hand (M3/M4, with comping).
 
