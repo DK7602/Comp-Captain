@@ -60,9 +60,12 @@ namespace
             sampleRate = rate;
             maxSamples = maxBlock;
             numChannels = channels;
-            buffered = alwaysNonRealtime == AlwaysNonRealtime::no;
             readers.clear();
 
+            // Two ways to read each take: ahead of time on a background thread (for real-time playback,
+            // so the audio thread never waits for the disk), and directly (for offline rendering, like an
+            // export, where every sample must be there however long it takes). JUCE doesn't pass on
+            // whether the DAW is offline, so both are ready and processBlock picks.
             int widest = 2;
             for (auto* region : getPlaybackRegions())
             {
@@ -70,18 +73,15 @@ namespace
                 widest = std::max (widest, (int) source->getChannelCount());
                 if (readers.count (source) != 0)
                     continue;
-                auto reader = std::make_unique<ClippedSourceReader> (source);
-                if (buffered)
+                Readers r;
+                r.direct = std::make_unique<ClippedSourceReader> (source);
+                if (alwaysNonRealtime == AlwaysNonRealtime::no)
                 {
                     const int ahead = std::max (4 * maxBlock, juce::roundToInt (2.0 * rate));
-                    auto bufferedReader = std::make_unique<juce::BufferingAudioReader> (reader.release(), *readThread, ahead);
-                    bufferedReaders[source] = bufferedReader.get();
-                    readers[source] = std::move (bufferedReader);
+                    r.ahead = std::make_unique<juce::BufferingAudioReader> (new ClippedSourceReader (source), *readThread, ahead);
+                    r.ahead->setReadTimeout (0);
                 }
-                else
-                {
-                    readers[source] = std::move (reader);
-                }
+                readers[source] = std::move (r);
             }
             scratch.setSize (widest, maxBlock);
         }
@@ -89,7 +89,6 @@ namespace
         void releaseResources() override
         {
             readers.clear();
-            bufferedReaders.clear();
         }
 
         bool processBlock (juce::AudioBuffer<float>& buffer, juce::AudioProcessor::Realtime realtime,
@@ -134,14 +133,14 @@ namespace
                     continue;
                 }
 
-                if (auto b = bufferedReaders.find (source); b != bufferedReaders.end())
-                    b->second->setReadTimeout (realtime == juce::AudioProcessor::Realtime::no ? 100 : 0);
+                const bool offline = realtime == juce::AudioProcessor::Realtime::no || found->second.ahead == nullptr;
+                juce::AudioFormatReader& reader = offline ? *found->second.direct : *found->second.ahead;
 
                 const int count = (int) render.getLength();
                 const int at = (int) (render.getStart() - block.getStart());
                 const int sourceChannels = std::min ((int) source->getChannelCount(), scratch.getNumChannels());
                 juce::AudioBuffer<float> into (scratch.getArrayOfWritePointers(), sourceChannels, count);
-                if (! found->second->read (&into, 0, count, render.getStart() + offset, true, true))
+                if (! reader.read (&into, 0, count, render.getStart() + offset, true, true))
                 {
                     ok = false;
                     continue;
@@ -170,12 +169,15 @@ namespace
     private:
         CompCaptainAraDocument& doc;
         juce::SharedResourcePointer<AraReadThread> readThread;
-        std::map<juce::ARAAudioSource*, std::unique_ptr<juce::AudioFormatReader>> readers;
-        std::map<juce::ARAAudioSource*, juce::BufferingAudioReader*> bufferedReaders;
+        struct Readers
+        {
+            std::unique_ptr<juce::AudioFormatReader> direct;       // offline: every sample, waiting if need be
+            std::unique_ptr<juce::BufferingAudioReader> ahead;     // real time: read ahead, never waits
+        };
+        std::map<juce::ARAAudioSource*, Readers> readers;
         juce::AudioBuffer<float> scratch;
         double sampleRate = 48000.0;
         int maxSamples = 512, numChannels = 2;
-        bool buffered = true;
     };
 }
 
