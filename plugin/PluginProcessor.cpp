@@ -1022,7 +1022,8 @@ std::shared_ptr<const CompCaptainProcessor::Song> CompCaptainProcessor::song()
     s->text = fromStd (reg.lyrics);
     s->lyrics = cc::Lyrics::parse (reg.lyrics);
 
-    std::deque<std::vector<cc::HeardWord>> words; // a deque: the pointers below stay put as it grows
+    std::deque<std::vector<cc::HeardWord>> words; // deques: the pointers below stay put as they grow
+    std::deque<std::vector<cc::Phrase>> phrases;
     std::vector<cc::TakeHeard> heard;
     for (auto* p : reg.all)
     {
@@ -1037,6 +1038,7 @@ std::shared_ptr<const CompCaptainProcessor::Song> CompCaptainProcessor::song()
                 continue;
             ++s->heardTakes;
             words.push_back (h->second.hearing.words);
+            phrases.push_back (h->second.hearing.phrases);
             cc::TakeHeard th;
             th.key = (p->uniqueId << 32) | t.id;
             th.startSeconds = t.start.seconds;
@@ -1046,6 +1048,7 @@ std::shared_ptr<const CompCaptainProcessor::Song> CompCaptainProcessor::song()
             th.role = t.role;
             th.favourite = t.favourite;
             th.words = &words.back();
+            th.phrases = &phrases.back();
             heard.push_back (th);
             s->takeNames[th.key] = fromStd (t.name) + (p->track.isNotEmpty() ? " (" + p->track + ")" : juce::String());
         }

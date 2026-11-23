@@ -229,6 +229,76 @@ namespace cc
         return out;
     }
 
+    void settleOnPhrases (std::vector<LinePlace>& lines, const std::vector<Phrase>& phrases)
+    {
+        if (lines.empty() || phrases.empty())
+            return;
+        constexpr double reach = 1.5, endReach = 1.0;
+
+        // each phrase start goes to the heard line whose start is nearest to it
+        std::vector<int> owner (phrases.size(), -1);
+        for (size_t k = 0; k < phrases.size(); ++k)
+        {
+            double best = reach;
+            for (size_t i = 0; i < lines.size(); ++i)
+            {
+                if (lines[i].sure <= 0.0f)
+                    continue;
+                const double d = std::abs (lines[i].start - phrases[k].start);
+                if (d < best)
+                {
+                    best = d;
+                    owner[k] = (int) i;
+                }
+            }
+        }
+        for (size_t i = 0; i < lines.size(); ++i)
+        {
+            auto& l = lines[i];
+            int pick = -1;
+            for (size_t k = 0; k < phrases.size(); ++k)
+                if (owner[k] == (int) i && (pick < 0 || std::abs (phrases[k].start - l.start) < std::abs (phrases[(size_t) pick].start - l.start)))
+                    pick = (int) k;
+            if (pick < 0)
+                continue;
+            const double target = phrases[(size_t) pick].start;
+            // stay between the lines around it
+            const double lo = i > 0 ? lines[i - 1].start + 0.05 : -1e9;
+            const double hi = i + 1 < lines.size() ? lines[i + 1].start - 0.05 : 1e9;
+            if (target <= lo || target >= hi)
+                continue;
+            const double shift = target - l.start;
+            l.start += shift;
+            l.end += shift;
+            for (auto& w : l.words)
+            {
+                w.start += shift;
+                w.end += shift;
+            }
+            // its end on the end of the phrase it finishes in, if that's close
+            double bestEnd = endReach;
+            for (auto& p : phrases)
+            {
+                const double d = std::abs (p.end - l.end);
+                if (p.end > l.start && d < bestEnd)
+                {
+                    bestEnd = d;
+                    l.end = p.end;
+                }
+            }
+            if (! l.words.empty())
+            {
+                l.words.back().end = std::max (l.words.back().start, std::min (l.words.back().end, l.end));
+                if (l.words.back().end < l.end && l.words.back().heard)
+                    l.words.back().end = l.end;
+            }
+        }
+        // no overlaps
+        for (size_t i = 0; i + 1 < lines.size(); ++i)
+            if (lines[i].end > lines[i + 1].start)
+                lines[i].end = std::max (lines[i].start, lines[i + 1].start);
+    }
+
     std::string lyricsFromWords (const std::vector<HeardWord>& words)
     {
         std::string out, line;

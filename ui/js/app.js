@@ -40,7 +40,7 @@
     align: JSON.parse(JSON.stringify(D.alignDefaults)),
     exportOn: {},
     sonicology: { voxology: 'installed', mixology: 'installed' },
-    version: '0.3.1', host: 'Browser preview',
+    version: '0.3.2', host: 'Browser preview',
     level: 0,
   };
   if (!PAGES.includes(S.page)) S.page = 'comp';

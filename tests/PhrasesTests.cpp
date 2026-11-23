@@ -79,3 +79,21 @@ TEST_CASE ("Resampling keeps the length and the pitch")
     const std::vector<std::vector<float>> stereo { { 1.0f, 0.0f }, { 0.0f, 1.0f } };
     CHECK (cc::toMono (stereo) == std::vector<float> { 0.5f, 0.5f });
 }
+
+TEST_CASE ("Seconds of silence before the singing don't hide the breaths")
+{
+    // 8 s of nothing, then two sung phrases with a quiet breath (-30 dB) between them
+    const double rate = 16000.0;
+    std::vector<float> take ((size_t) (14 * rate), 0.0f);
+    for (size_t i = (size_t) (8 * rate); i < take.size(); ++i)
+    {
+        const double t = (double) i / rate;
+        const bool breath = t > 10.5 && t < 11.0;
+        take[i] = (float) ((breath ? 0.01 : 0.3) * std::sin (t * 2.0 * 3.14159 * 220.0));
+    }
+    const auto phrases = cc::findPhrases (take.data(), take.size(), rate);
+    REQUIRE (phrases.size() == 2);
+    CHECK (std::abs (phrases[0].start - 8.0) < 0.02);
+    CHECK (std::abs (phrases[0].end - 10.5) < 0.02);
+    CHECK (std::abs (phrases[1].start - 11.0) < 0.02);
+}

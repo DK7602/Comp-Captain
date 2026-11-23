@@ -300,3 +300,20 @@ TEST_CASE ("What was heard is kept next to the take")
     CHECK_FALSE (cc::loadHearing (dir.path / "Take 2.wav").has_value());
     CHECK_FALSE (cc::hearingFromText ("something else").has_value());
 }
+
+TEST_CASE ("Lines settle on the breath before them")
+{
+    const auto lyrics = cc::Lyrics::parse ("So happy birthday baby\nI'm so glad we're friends\nAnd so on\n");
+    // the recognizer put each line about a second early; the singing starts at 14.27 and 17.65
+    auto placed = cc::placeLines (lyrics, heard ({ { "So", 13.0 }, { "happy", 13.4 }, { "birthday", 13.9 }, { "baby", 14.5 },
+                                                   { "I'm", 16.7 }, { "so", 17.0 }, { "glad", 17.3 }, { "we're", 17.6 }, { "friends", 18.0 },
+                                                   { "And", 30.0 }, { "so", 30.3 }, { "on", 30.6 } }));
+    REQUIRE (placed.size() == 3);
+    cc::settleOnPhrases (placed, { { 14.27, 16.5 }, { 17.65, 20.79 }, { 33.0, 35.0 } });
+    CHECK (placed[0].start == Approx (14.27));
+    CHECK (placed[0].words[0].start == Approx (14.27));     // its words move with it
+    CHECK (placed[0].words[1].start == Approx (14.67));
+    CHECK (placed[0].end == Approx (16.5));                 // and it ends where the phrase ends
+    CHECK (placed[1].start == Approx (17.65));
+    CHECK (placed[2].start == Approx (30.0));               // no phrase start near it: it stays
+}

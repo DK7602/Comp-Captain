@@ -100,6 +100,21 @@ TEST_CASE ("Words heard where nobody sings are dropped")
     CHECK (cc::keepWordsInPhrases (words, {}).size() == words.size());
 }
 
+TEST_CASE ("Only the sung parts are listened to, and words go back to their place in the take")
+{
+    // phrases at 8-10.5, 11-14 (a breath: kept together) and 30-32 (after a long gap: a part of its own)
+    const auto parts = cc::sungParts ({ { 8.0, 10.5 }, { 11.0, 14.0 }, { 30.0, 32.0 } }, 40.0);
+    REQUIRE (parts.size() == 2);
+    CHECK (parts[0].from == 7.75);
+    CHECK (parts[0].to == 14.25);
+    CHECK (parts[0].at == 0.0);
+    CHECK (parts[1].from == 29.75);
+    CHECK (parts[1].at == 6.5 + cc::partGap);
+    CHECK (cc::takeTime (parts, 0.25) == 8.0);
+    CHECK (cc::takeTime (parts, 6.8) == 14.25);              // in the pause: the end of the part before
+    CHECK (cc::takeTime (parts, 7.25) == 30.0);
+}
+
 TEST_CASE ("A missing model gives a plain reason")
 {
     cc::SpeechRecognizer sr;

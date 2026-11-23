@@ -35,6 +35,11 @@ namespace cc
     // The same, looking only at lines firstLine..lastLine (a take known to sit in that part of the song).
     std::vector<LinePlace> placeLines (const Lyrics&, const std::vector<HeardWord>&, int firstLine, int lastLine);
 
+    // Lines usually start just after a breath. The recognizer's word times can be off by a second, so a line
+    // that starts near the start of a sung phrase (within 1.5 s, and nearer to it than any other line) is
+    // moved onto it, its words with it; its end settles on a phrase end the same way. Lines stay in order.
+    void settleOnPhrases (std::vector<LinePlace>&, const std::vector<Phrase>&);
+
     // How alike two plain words are, 0..1 ("love" / "loves" ~ 0.8).
     double wordLikeness (const std::string& a, const std::string& b);
 

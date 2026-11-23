@@ -28,10 +28,18 @@ namespace cc
         std::vector<double> sorted = db;
         std::sort (sorted.begin(), sorted.end());
         const double loud = sorted[(size_t) ((double) (frames - 1) * 0.9)];
-        const double floorDb = sorted[(size_t) ((double) (frames - 1) * 0.1)];
+        // the quiet between phrases (breaths, room noise), not counting digital silence: a take that starts
+        // with seconds of nothing would otherwise make every breath look loud
+        std::vector<double> heard;
+        for (double d : sorted)
+            if (d > -90.0)
+                heard.push_back (d);
+        const double floorDb = heard.empty() ? sorted[(size_t) ((double) (frames - 1) * 0.1)]
+                                             : heard[(size_t) ((double) (heard.size() - 1) * 0.1)];
         if (loud - floorDb < 10.0 && loud < -50.0)
             return {}; // silence, or nothing but noise
-        const double threshold = std::max (loud + o.quietBelowDb, floorDb + 6.0);
+        // never so high that the loud parts themselves fall under it
+        const double threshold = std::min (std::max (loud + o.quietBelowDb, floorDb + 6.0), loud - 6.0);
 
         // sound / no sound, then close short gaps and drop short bits
         std::vector<Phrase> raw;

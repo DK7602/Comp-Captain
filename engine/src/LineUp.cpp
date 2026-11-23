@@ -172,6 +172,11 @@ namespace cc
                 it->second = std::move (again);
         }
 
+        // 3. lines settle on the breaths before them
+        for (auto& t : takes)
+            if (auto it = out.takes.find (t.key); it != out.takes.end() && t.phrases != nullptr)
+                settleOnPhrases (it->second, *t.phrases);
+
         out.lines = songLines (lyrics, takes, out.takes, [] (const TakeHeard&) { return true; });
         for (auto& t : takes)
             if (setsTiming (t.role) && out.takes.count (t.key) != 0)

@@ -53,6 +53,18 @@ namespace cc
     std::optional<Hearing> hearTake (SpeechRecognizer&, const std::filesystem::path& wav,
                                      const SpeechRecognizer::Options&, std::string& error);
 
+    // The parts of a take that are listened to: the sung phrases (with a little room either side, phrases
+    // under a second apart kept together), each placed 'at' seconds into the joined audio, with a pause of
+    // partGap seconds after each one.
+    struct SungPart
+    {
+        double from = 0.0, to = 0.0; // take seconds
+        double at = 0.0;             // where it starts in the joined audio
+    };
+    inline constexpr double partGap = 0.5;
+    std::vector<SungPart> sungParts (const std::vector<Phrase>& phrases, double takeLength);
+    double takeTime (const std::vector<SungPart>&, double joinedSeconds);
+
     // Words that sit outside every phrase (by more than a little) are dropped.
     std::vector<HeardWord> keepWordsInPhrases (const std::vector<HeardWord>&, const std::vector<Phrase>&);
 }

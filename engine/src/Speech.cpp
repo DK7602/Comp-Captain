@@ -137,6 +137,42 @@ namespace cc
         return words;
     }
 
+    std::vector<SungPart> sungParts (const std::vector<Phrase>& phrases, double takeLength)
+    {
+        // phrases less than a second apart stay together (a breath inside a line), with a little room
+        // either side so first and last sounds aren't clipped
+        constexpr double joinBelow = 1.0, room = 0.25;
+        std::vector<SungPart> out;
+        double at = 0.0;
+        for (auto& p : phrases)
+        {
+            const double from = std::max (0.0, p.start - room), to = std::min (takeLength, p.end + room);
+            if (! out.empty() && from - out.back().to < joinBelow)
+            {
+                out.back().to = std::max (out.back().to, to);
+                continue;
+            }
+            if (! out.empty())
+                at = out.back().at + (out.back().to - out.back().from) + partGap;
+            out.push_back ({ from, to, at });
+        }
+        return out;
+    }
+
+    double takeTime (const std::vector<SungPart>& parts, double t)
+    {
+        // a time in the joined audio -> the same moment in the take (inside the pause after a part: its end)
+        for (size_t i = 0; i < parts.size(); ++i)
+        {
+            const auto& p = parts[i];
+            const double len = p.to - p.from;
+            const bool last = i + 1 == parts.size();
+            if (t < p.at + len + partGap || last)
+                return p.from + std::clamp (t - p.at, 0.0, len);
+        }
+        return t;
+    }
+
     std::vector<HeardWord> keepWordsInPhrases (const std::vector<HeardWord>& words, const std::vector<Phrase>& phrases)
     {
         if (phrases.empty())
@@ -201,11 +237,31 @@ namespace cc
 
         auto audio = resample (mono, info.sampleRate, SpeechRecognizer::sampleRate);
         std::vector<float>().swap (mono);
-        auto words = sr.listen (audio.data(), audio.size(), options);
+
+        // Only the sung parts are listened to, joined end to end with a short pause between them: long
+        // silences (the bars before you come in, a break) throw the recognizer's word times off badly.
+        const auto parts = sungParts (h.phrases, (double) audio.size() / SpeechRecognizer::sampleRate);
+        std::vector<float> joined;
+        for (auto& p : parts)
+        {
+            const auto a = (size_t) std::lround (p.from * SpeechRecognizer::sampleRate);
+            const auto b = std::min (audio.size(), (size_t) std::lround (p.to * SpeechRecognizer::sampleRate));
+            if (b > a)
+                joined.insert (joined.end(), audio.begin() + (std::ptrdiff_t) a, audio.begin() + (std::ptrdiff_t) b);
+            joined.insert (joined.end(), (size_t) std::lround (partGap * SpeechRecognizer::sampleRate), 0.0f);
+        }
+        std::vector<float>().swap (audio);
+
+        auto words = sr.listen (joined.data(), joined.size(), options);
         if (! words.has_value())
         {
             error = (options.cancel != nullptr && options.cancel->load()) ? "Stopped." : "Listening didn't work on this take.";
             return std::nullopt;
+        }
+        for (auto& w : *words)
+        {
+            w.start = takeTime (parts, w.start);
+            w.end = std::max (w.start, takeTime (parts, w.end));
         }
         h.words = keepWordsInPhrases (*words, h.phrases);
         return h;

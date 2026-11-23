@@ -39,7 +39,10 @@ int main (int argc, char** argv)
     }
     for (auto& w : heard->words)
         std::printf ("%7.2f %7.2f  %.2f %s\n", w.start, w.end, w.probability, w.text.c_str());
-    std::printf ("(%zu words, %zu phrases, %.1f s to listen)\n", heard->words.size(), heard->phrases.size(), secs);
+    std::printf ("phrases:");
+    for (auto& p : heard->phrases)
+        std::printf (" %.2f-%.2f", p.start, p.end);
+    std::printf ("\n(%zu words, %zu phrases, %.1f s to listen)\n", heard->words.size(), heard->phrases.size(), secs);
 
     if (argc > 3)
     {
@@ -51,6 +54,7 @@ int main (int argc, char** argv)
         t.key = 1;
         t.lengthSeconds = heard->phrases.empty() ? 0.0 : heard->phrases.back().end;
         t.words = &heard->words;
+        t.phrases = &heard->phrases;
         const auto up = cc::lineUpSong (lyrics, { t });
         std::printf ("\n%zu lines, %zu sections:\n", lyrics.lines.size(), lyrics.sections.size());
         for (auto& l : up.lines)

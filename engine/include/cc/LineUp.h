@@ -24,6 +24,7 @@ namespace cc
         Role role = Role::lead;
         bool favourite = false;
         const std::vector<HeardWord>* words = nullptr;
+        const std::vector<Phrase>* phrases = nullptr; // its sung phrases (lines settle on them)
     };
 
     struct SongLine

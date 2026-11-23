@@ -270,6 +270,13 @@ Pass: on the owner's real takes, lines land within a word of where they belong.
   (listening %, waiting for the recording to stop, take didn't match the lyrics, speech problem); Settings has a
   "Lyrics & listening" report to copy (model path, AVX2, listening state, every take's heard words and lines found);
   listening no longer waits forever if the DAW stops sending audio blocks right after a recording.
+- 0.3.2: the owner's first take was listened to but no line matched. Found: whisper's word times fall apart when a
+  take has long silences (8 s before the singing bunched every word into the last second). Now only the sung parts
+  (phrases, joined if under 1 s apart, 0.25 s room) are listened to, end to end with 0.5 s pauses, and each word is
+  mapped back to its place in the take (engine `sungParts` / `takeTime`). Lines then settle on the start of the
+  phrase they begin in (within 1.5 s; whisper was often ~1 s early) and end on a phrase end (`settleOnPhrases`). The
+  phrase finder ignores digital silence when judging the quiet level, so silence before the singing doesn't hide the
+  breaths. Same take with and without 8 s of silence in front now gives the same lines, 8 s apart.
 - Not yet: ARA takes aren't listened to yet (their audio comes through the ARA reader: later);
   dragging a line's ends by hand (M3/M4, with comping).
 
