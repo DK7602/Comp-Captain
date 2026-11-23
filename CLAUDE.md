@@ -14,9 +14,11 @@ doubled guitars to the lead. **The plan is `docs/PLAN.md`: read it first.**
 - The owner cares most about **big lyrics on the Record page** (the teleprompter).
 - Decisions are in `docs/PLAN.md`, "Decisions after the art". Interface: **web view** (`ui/`), packed into the
   plug-in. Keep the title, logo, glows and backgrounds exactly as the owner's art (`art/`); layout is ours.
-- **Header art** (both looks, since 0.2.1): the owner's `art/header.webp` (logo + sound waves + title + tagline in
-  one picture) -> `ui/img/header.png` via `art/make_header.py`. The owner has a new Assistant badge to send as a
-  file (only seen as a chat picture so far).
+- **Header and Assistant badge art** (both looks, since 0.2.1): the owner's `art/header.webp` (logo + sound waves +
+  title + tagline in one picture) -> `ui/img/header.png` via `art/make_header.py`, and `art/assistant.webp` ->
+  `ui/img/assistant.png` via `art/make_assistant.py`.
+- Pictures the owner sends while a turn is running only arrive as chat images, not files: ask them to resend
+  when the turn has ended (they land in the session's `images/` folder).
 - Takes are saved in `Documents/Comp Captain/<date> <track> (<id>)/` (owner's choice). `COMP_CAPTAIN_TAKES_FOLDER`
   overrides it (tests).
 - **Interface files must stay plain ASCII** (write `\u2013` in JS, `&#x2013;` in HTML, `\2013` in CSS): Linux's

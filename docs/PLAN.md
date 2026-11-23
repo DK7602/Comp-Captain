@@ -176,8 +176,8 @@ stay sharp on high-resolution screens. The sound-wave glow behind the logo and t
 background) and sent new art: `art/header.webp` (logo, sound waves, "COMP CAPTAIN" and the tagline in one picture,
 built into `ui/img/header.png` by `art/make_header.py`). It's the header in **both looks** (owner's choice); the
 logo button is a see-through click area over its microphone. The old logo, title and drawn header waves are gone
-(the originals stay in `art/`). The light Assistant badge is cleaned (`art/make_assistant.py`); the owner also has
-a new Assistant badge to send as a file.
+(the originals stay in `art/`). The owner's new Assistant badge (`art/assistant.webp`, built into
+`ui/img/assistant.png` by `art/make_assistant.py`) is used in both looks too.
 
 ## Milestones (each one ends with a test in Cubase)
 
