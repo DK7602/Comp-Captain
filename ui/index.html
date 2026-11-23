@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comp Captain</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="stage" data-theme="dark" data-page="comp" data-compview="line">
+
+  <!-- Background: the owner's plate, plus crisp redrawn lines -->
+  <div class="bg"></div>
+  <div class="bg-line" style="top:767px"></div>
+
+  <!-- ===================== HEADER ===================== -->
+  <header id="header">
+    <canvas id="waveglow" width="1100" height="110"></canvas>
+    <button id="logo" class="logo" title="Click to switch light / dark look" aria-label="Switch light or dark look">
+      <img src="img/logo.png" alt="Comp Captain logo" draggable="false">
+    </button>
+    <img class="title" src="img/title.png" alt="Comp Captain - Professional Vocal Comping" draggable="false">
+    <img class="script" src="img/script.png" alt="Your Comping Captain" draggable="false">
+    <div class="corner-btns">
+      <button class="icon-btn" id="btn-settings" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24"><use href="#i-gear"/></svg></button>
+      <button class="icon-btn" id="btn-help" title="Manual" aria-label="Manual"><span>?</span></button>
+    </div>
+  </header>
+
+  <!-- ===================== LEFT: PAGES ===================== -->
+  <nav id="nav" class="panel">
+    <button class="nav-btn" data-go="record"><svg viewBox="0 0 24 24"><use href="#i-mic"/></svg><b>Record</b><small>Capture · Teleprompter</small></button>
+    <button class="nav-btn" data-go="lyrics"><svg viewBox="0 0 24 24"><use href="#i-lyrics"/></svg><b>Lyrics</b><small>Paste · Open · Hear It</small></button>
+    <button class="nav-btn" data-go="comp"><svg viewBox="0 0 24 24"><use href="#i-crown"/></svg><b>Comp</b><small>Build Best Take</small></button>
+    <button class="nav-btn" data-go="tighten"><svg viewBox="0 0 24 24"><use href="#i-target"/></svg><b>Tighten</b><small>Doubles · Ad-Libs · BV</small></button>
+    <button class="nav-btn" data-go="review"><svg viewBox="0 0 24 24"><use href="#i-bars"/></svg><b>Review</b><small>Scores · Style · Check</small></button>
+    <button class="nav-btn" data-go="export"><svg viewBox="0 0 24 24"><use href="#i-export"/></svg><b>Export</b><small>Render · Drag to DAW</small></button>
+    <svg class="compass" viewBox="0 0 200 200" aria-hidden="true"><use href="#compass"/></svg>
+  </nav>
+
+  <!-- ===================== CENTRE ===================== -->
+  <main id="main" class="panel">
+
+    <!-- Track picker + audition transport -->
+    <div class="topbar">
+      <div class="select track-select" id="track-select">
+        <svg viewBox="0 0 24 24"><use href="#i-folder"/></svg>
+        <span id="track-name">Vocal – Lead (Verse 1)</span>
+        <svg class="chev" viewBox="0 0 24 24"><use href="#i-chev-down"/></svg>
+      </div>
+      <div class="btn-group">
+        <button class="sq" id="t-start" title="Back to start"><svg viewBox="0 0 24 24"><use href="#i-start"/></svg></button>
+        <button class="sq gold" id="t-play" title="Play / pause audition"><svg viewBox="0 0 24 24"><use href="#i-play"/></svg></button>
+        <button class="sq" id="t-stop" title="Stop"><svg viewBox="0 0 24 24"><use href="#i-stop"/></svg></button>
+        <button class="sq gold-outline" id="t-loop" title="Loop the line"><svg viewBox="0 0 24 24"><use href="#i-loop"/></svg></button>
+      </div>
+      <div class="time" id="time"><span id="time-now">0:24.316</span><i></i><span id="time-len">1:03.772</span></div>
+      <button class="sq txt" id="t-ab" title="A/B: before and after">A/B</button>
+      <button class="sq" id="t-solo" title="Hear this take on its own"><svg viewBox="0 0 24 24"><use href="#i-phones"/></svg></button>
+      <button class="sq" id="t-vol" title="Audition volume"><svg viewBox="0 0 24 24"><use href="#i-speaker"/></svg></button>
+      <div class="slider gold-slider vol" data-value="0.8"><div class="track"><div class="fill"></div></div><div class="knob"></div></div>
+    </div>
+
+    <!-- Current lyric line + sections strip (all pages except Record) -->
+    <div class="lyricbar">
+      <div class="lyric-line">
+        <button class="arrow" id="line-prev" title="Previous line"><svg viewBox="0 0 24 24"><use href="#i-chev-left"/></svg></button>
+        <div class="line-text" id="line-text"></div>
+        <button class="arrow" id="line-next" title="Next line"><svg viewBox="0 0 24 24"><use href="#i-chev-right"/></svg></button>
+      </div>
+      <div class="chips" id="section-chips"></div>
+      <div class="overview">
+        <button class="mini-arrow" id="ov-left">◀</button>
+        <canvas id="overview" width="900" height="36"></canvas>
+        <button class="mini-arrow" id="ov-right">▶</button>
+        <div class="ov-playhead" id="ov-playhead"></div>
+      </div>
+      <div class="ruler" id="ruler"></div>
+    </div>
+
+    <!-- ===== PAGE: RECORD ===== -->
+    <section class="page" data-page="record">
+      <div class="rec-title"><span class="wave-l"></span><svg viewBox="0 0 24 24"><use href="#i-mic"/></svg><span>LYRIC RECORDING MODE</span><span class="wave-r"></span></div>
+      <div class="rec-info">
+        <div class="pill-select gold-outline"><button id="rec-sec-prev">‹</button><span id="rec-section">Verse 1</span><button id="rec-sec-next">›</button></div>
+        <span class="sep"></span><span>BPM <b id="rec-bpm">92</b></span>
+        <span class="sep"></span><span>Key <b id="rec-key">E minor</b></span>
+        <span class="sep"></span><span id="rec-sig">4/4</span>
+        <span class="sep"></span>
+        <button class="sq gold-outline" id="rec-click" title="Count-in click"><svg viewBox="0 0 24 24"><use href="#i-metronome"/></svg></button>
+        <button class="pill gold-outline on" id="rec-loop"><svg viewBox="0 0 24 24"><use href="#i-loop"/></svg>Loop</button>
+      </div>
+      <div class="prompter" id="prompter">
+        <div class="p-line prev" id="p-prev"></div>
+        <div class="p-line now" id="p-now"></div>
+        <div class="p-line next" id="p-next"></div>
+        <div class="p-head"></div>
+      </div>
+      <div class="rec-wave">
+        <div class="bars" id="rec-bars"></div>
+        <canvas id="rec-canvas" width="1040" height="70"></canvas>
+        <div class="p-head small"></div>
+      </div>
+      <div class="rec-controls">
+        <div class="pill-select gold-outline big"><button id="take-prev">‹</button><span id="rec-take">Take 6 of 8</span><button id="take-next">›</button></div>
+        <div class="transport">
+          <button class="round" id="r-start" title="Back to the start of the section"><svg viewBox="0 0 24 24"><use href="#i-start"/></svg></button>
+          <button class="round rec" id="r-arm" title="Arm CAPTURE. Recording starts when you press Record in your DAW."><i></i></button>
+          <button class="round" id="r-stop" title="Stop"><svg viewBox="0 0 24 24"><use href="#i-stop"/></svg></button>
+          <button class="round" id="r-play" title="Play"><svg viewBox="0 0 24 24"><use href="#i-play"/></svg></button>
+        </div>
+        <div class="meter-box"><div class="meter" id="rec-meter"></div><button class="sq gold-outline" title="Hear yourself"><svg viewBox="0 0 24 24"><use href="#i-phones"/></svg></button></div>
+      </div>
+    </section>
+
+    <!-- ===== PAGE: LYRICS ===== -->
+    <section class="page" data-page="lyrics">
+      <div class="lyr-tools">
+        <button class="tool-btn" id="lyr-paste"><svg viewBox="0 0 24 24"><use href="#i-paste"/></svg><b>Paste</b><small>From anywhere</small></button>
+        <button class="tool-btn" id="lyr-open"><svg viewBox="0 0 24 24"><use href="#i-folder"/></svg><b>Open File</b><small>.txt · .docx · .lrc</small></button>
+        <button class="tool-btn" id="lyr-hear"><svg viewBox="0 0 24 24"><use href="#i-ear"/></svg><b>Hear It</b><small>Written from your takes</small></button>
+        <button class="tool-btn extras" id="lyr-extras"><svg viewBox="0 0 24 24"><use href="#i-song"/></svg><b>From My Songs</b><small>Song Rider Pro · Song Savant · Key Compass</small></button>
+      </div>
+      <div class="lyr-body">
+        <div class="lyr-editor">
+          <div class="box-head"><svg viewBox="0 0 24 24"><use href="#i-lyrics"/></svg>Lyrics <span class="dim">— type <b>[Verse 1]</b>, <b>[Chorus]</b>… above a part to make sections</span></div>
+          <textarea id="lyr-text" spellcheck="false"></textarea>
+        </div>
+        <div class="lyr-lines">
+          <div class="box-head"><svg viewBox="0 0 24 24"><use href="#i-target"/></svg>Lined up with the audio</div>
+          <div class="lyr-list" id="lyr-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== PAGE: COMP ===== -->
+    <section class="page" data-page="comp">
+      <!-- Line view -->
+      <div class="takes-box view-line">
+        <div class="takes-head">
+          <svg class="chev" viewBox="0 0 24 24"><use href="#i-chev-down"/></svg><b>Takes – Current Line</b>
+          <div class="line-info"><span id="li-count">Line 3 of 12 | Verse 1</span><i id="li-text"></i></div>
+          <div class="cols"><span><svg viewBox="0 0 24 24"><use href="#i-fork"/></svg>Pitch</span><span><svg viewBox="0 0 24 24"><use href="#i-clock"/></svg>Timing</span><span><svg viewBox="0 0 24 24"><use href="#i-gem"/></svg>Clarity</span><span><svg viewBox="0 0 24 24"><use href="#i-bolt"/></svg>Energy</span><span class="tot"><svg viewBox="0 0 24 24"><use href="#i-star"/></svg>Total</span></div>
+        </div>
+        <div class="take-rows" id="take-rows"></div>
+      </div>
+      <!-- Song view -->
+      <div class="lanes-box view-song">
+        <div class="lanes-head">
+          <button class="pill" id="sv-sections"><svg viewBox="0 0 24 24"><use href="#i-lyrics"/></svg>Lyrics / Sections</button>
+          <div class="lane-lyrics" id="lane-lyrics"></div>
+        </div>
+        <div class="lanes" id="lanes"></div>
+      </div>
+      <!-- Best comp (both views) -->
+      <div class="best-comp">
+        <div class="bc-head"><svg viewBox="0 0 24 24"><use href="#i-crown"/></svg><b>Best Comp</b><span>(Assembled Performance)</span></div>
+        <div class="bc-body">
+          <button class="sq gold" id="bc-play" title="Play the comp"><svg viewBox="0 0 24 24"><use href="#i-play"/></svg></button>
+          <div class="bc-wave"><canvas id="bc-canvas" width="930" height="56"></canvas><div class="bc-tags" id="bc-tags"></div><div class="p-head small"></div></div>
+        </div>
+      </div>
+      <div class="comp-actions">
+        <button class="sq big" id="undo" title="Undo"><svg viewBox="0 0 24 24"><use href="#i-undo"/></svg></button>
+        <button class="sq big" id="redo" title="Redo"><svg viewBox="0 0 24 24"><use href="#i-redo"/></svg></button>
+        <button class="act gold" id="auto-comp"><svg viewBox="0 0 24 24"><use href="#i-wand"/></svg><b>AUTO COMP</b><small>Pick the best take for every line</small></button>
+        <button class="act" id="swap-take"><svg viewBox="0 0 24 24"><use href="#i-swap"/></svg><b>SWAP TAKE</b><small>(Use the chosen take here)</small></button>
+        <div class="mini-field"><label>STYLE</label><div class="select" id="comp-style"><span id="comp-style-name">Worship / Gospel</span><svg class="chev" viewBox="0 0 24 24"><use href="#i-chev-down"/></svg></div></div>
+        <div class="mini-field"><label>VIEW</label><div class="seg" id="view-seg"><button data-view="line">Line</button><button data-view="song">Song</button></div></div>
+      </div>
+    </section>
+
+    <!-- ===== PAGE: TIGHTEN ===== -->
+    <section class="page" data-page="tighten">
+      <div class="tight-box">
+        <div class="takes-head"><svg class="chev" viewBox="0 0 24 24"><use href="#i-chev-down"/></svg><b>Layers lined up to the Lead</b>
+          <div class="seg small" id="ba-seg"><button data-ba="before">Before</button><button data-ba="after">After</button></div></div>
+        <div class="tight-lanes" id="tight-lanes"></div>
+      </div>
+    </section>
+
+    <!-- ===== PAGE: REVIEW ===== -->
+    <section class="page" data-page="review">
+      <div class="review-box">
+        <div class="takes-head"><svg class="chev" viewBox="0 0 24 24"><use href="#i-chev-down"/></svg><b>Every Line – Best Comp</b>
+          <div class="cols"><span>Take</span><span>Pitch</span><span>Timing</span><span>Clarity</span><span>Energy</span><span class="tot">Total</span></div></div>
+        <div class="review-rows" id="review-rows"></div>
+      </div>
+    </section>
+
+    <!-- ===== PAGE: EXPORT ===== -->
+    <section class="page" data-page="export">
+      <div class="export-box">
+        <div class="takes-head"><svg class="chev" viewBox="0 0 24 24"><use href="#i-chev-down"/></svg><b>Files to make</b><span class="dim">bar-aligned, named by role, ready for any DAW</span></div>
+        <div class="export-rows" id="export-rows"></div>
+        <div class="export-opts">
+          <div class="mini-field"><label>FORMAT</label><div class="select"><span>WAV 24-bit</span><svg class="chev" viewBox="0 0 24 24"><use href="#i-chev-down"/></svg></div></div>
+          <div class="mini-field"><label>SAMPLE RATE</label><div class="select"><span>Same as project</span><svg class="chev" viewBox="0 0 24 24"><use href="#i-chev-down"/></svg></div></div>
+          <div class="mini-field"><label>FOLDER</label><div class="select wide"><span>Next to the project / Comp Captain</span><svg class="chev" viewBox="0 0 24 24"><use href="#i-chev-down"/></svg></div></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===================== RIGHT PANEL (changes with the page) ===================== -->
+  <aside id="side" class="panel">
+    <!-- Record: Takes + Sections -->
+    <div class="side-page" data-page="record">
+      <div class="side-box">
+        <div class="side-title"><svg viewBox="0 0 24 24"><use href="#i-layers"/></svg>TAKES <span class="gold" id="takes-count">(8)</span></div>
+        <div class="take-list" id="take-list"></div>
+      </div>
+      <div class="side-box">
+        <div class="side-title"><svg viewBox="0 0 24 24"><use href="#i-list"/></svg>SECTIONS</div>
+        <div class="sec-list" id="sec-list"></div>
+      </div>
+    </div>
+    <!-- Lyrics: sources + sections -->
+    <div class="side-page" data-page="lyrics">
+      <div class="side-box">
+        <div class="side-title"><svg viewBox="0 0 24 24"><use href="#i-lyrics"/></svg>Lyrics Status</div>
+        <div class="status-list">
+          <div><i class="ok"></i>12 lines · 4 sections</div>
+          <div><i class="ok"></i>Lined up on 5 takes</div>
+          <div><i class="warn"></i>Line 7: check the end (drag it)</div>
+        </div>
+      </div>
+      <div class="side-box">
+        <div class="side-title"><svg viewBox="0 0 24 24"><use href="#i-list"/></svg>SECTIONS</div>
+        <div class="sec-list" id="sec-list-2"></div>
+      </div>
+    </div>
+    <!-- Comp: scores for the current line -->
+    <div class="side-page" data-page="comp">
+      <div class="side-head"><svg viewBox="0 0 24 24"><use href="#i-bars"/></svg>Line Scores</div>
+      <div class="side-box">
+        <div class="box-title">Current Line <span class="dim" id="sc-best">(Best Take: T3)</span></div>
+        <div class="score-sliders" id="score-sliders"></div>
+      </div>
+      <div class="side-box">
+        <div class="box-title">Why this take</div>
+        <ul class="reasons" id="reasons"></ul>
+      </div>
+      <div class="side-box">
+        <div class="box-title">Picky-ness</div>
+        <div class="row-slider"><span>Fewer cuts</span><div class="slider gold-slider" data-value="0.45" id="picky"><div class="track"><div class="fill"></div></div><div class="knob"></div></div><span>Best every line</span></div>
+      </div>
+    </div>
+    <!-- Tighten: Alignment & Layers -->
+    <div class="side-page" data-page="tighten">
+      <div class="side-head"><svg viewBox="0 0 24 24"><use href="#i-layers"/></svg>Alignment &amp; Layers</div>
+      <div class="tabs" id="layer-tabs"><button data-tab="doubles">Doubles</button><button data-tab="adlibs">Ad-Libs</button><button data-tab="bv">BV</button><button data-tab="guitars">Guitars</button></div>
+      <div class="side-box" id="align-box"></div>
+      <div class="side-box">
+        <div class="box-title"><svg viewBox="0 0 24 24"><use href="#i-layers"/></svg>Layer Control</div>
+        <div class="layer-ctl" id="layer-ctl"></div>
+      </div>
+    </div>
+    <!-- Review: style and weights -->
+    <div class="side-page" data-page="review">
+      <div class="side-head"><svg viewBox="0 0 24 24"><use href="#i-bars"/></svg>Scoring Style</div>
+      <div class="side-box">
+        <div class="style-grid" id="style-grid"></div>
+      </div>
+      <div class="side-box">
+        <div class="box-title">How much each score counts</div>
+        <div class="score-sliders" id="weight-sliders"></div>
+      </div>
+    </div>
+    <!-- Export: send -->
+    <div class="side-page" data-page="export">
+      <div class="side-head"><svg viewBox="0 0 24 24"><use href="#i-export"/></svg>Send</div>
+      <div class="side-box drag-tile" draggable="true" id="drag-tile">
+        <svg viewBox="0 0 24 24"><use href="#i-drag"/></svg>
+        <b>DRAG TO DAW</b><small>Drag this onto your project. Every file lands on its bar.</small>
+      </div>
+      <div class="side-box sonicology" id="sonicology-box">
+        <div class="box-title">Sonicology Suite <span class="dot on"></span><span class="dim">found</span></div>
+        <button class="send-btn" data-send="voxology"><svg viewBox="0 0 24 24"><use href="#i-wave"/></svg>Send to Voxology<svg class="ext" viewBox="0 0 24 24"><use href="#i-ext"/></svg></button>
+        <button class="send-btn" data-send="mixology"><svg viewBox="0 0 24 24"><use href="#i-sliders"/></svg>Send to Mixology<svg class="ext" viewBox="0 0 24 24"><use href="#i-ext"/></svg></button>
+        <p class="dim small">Roles and lyrics go with the files, so Voxology knows a double from a lead.</p>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===================== FOOTER ===================== -->
+  <footer id="footer">
+    <img class="assistant for-dark" src="img/assistant.png" alt="Comp Captain Assistant" draggable="false">
+    <img class="assistant for-light" src="img/assistant-light.png" alt="Comp Captain Assistant" draggable="false">
+    <div class="msg-box" id="msg-box">
+      <div class="msg-top"><span class="check">✓</span><b id="msg-title"></b></div>
+      <div class="msg-ticks" id="msg-ticks"></div>
+    </div>
+    <div class="opt-box" id="opt-box"></div>
+    <div class="send-col" id="send-col"></div>
+    <button class="go-btn" id="go-btn"><svg viewBox="0 0 24 24"><use href="#i-play"/></svg><span id="go-label">Build<br>Performance</span></button>
+  </footer>
+
+  <!-- ===================== OVERLAYS ===================== -->
+  <div class="overlay" id="manual" hidden>
+    <div class="sheet panel">
+      <div class="sheet-head"><b>Comp Captain Manual</b><button class="icon-btn" data-close>✕</button></div>
+      <div class="sheet-body" id="manual-body"></div>
+    </div>
+  </div>
+  <div class="overlay" id="settings" hidden>
+    <div class="sheet panel small">
+      <div class="sheet-head"><b>Settings</b><button class="icon-btn" data-close>✕</button></div>
+      <div class="sheet-body" id="settings-body"></div>
+    </div>
+  </div>
+  <div class="toast" id="toast" hidden></div>
+</div>
+
+<!-- ===================== ICONS ===================== -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="g-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff1b0"/><stop offset=".45" stop-color="#ffc83a"/><stop offset="1" stop-color="#b47a10"/></linearGradient>
+    <linearGradient id="g-gold-h" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe9a0"/><stop offset=".5" stop-color="#e9a917"/><stop offset="1" stop-color="#7a520a"/></linearGradient>
+    <radialGradient id="g-compass-glow"><stop offset="0" stop-color="#3f8cff" stop-opacity=".35"/><stop offset="1" stop-color="#3f8cff" stop-opacity="0"/></radialGradient>
+  </defs>
+  <symbol id="i-gear" viewBox="0 0 24 24"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.5 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="8.5" y="2.5" width="7" height="12" rx="3.5"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5v4M8.5 21.5h7M8.5 6.5h2M8.5 9.5h2M13.5 6.5h2M13.5 9.5h2"/></g></symbol>
+  <symbol id="i-lyrics" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h11M4 10h11M4 14h7"/><path d="M18 5v10.5"/><circle cx="16" cy="16.5" r="2.2"/><path d="M18 5l3 1.5"/></g></symbol>
+  <symbol id="i-crown" viewBox="0 0 24 24"><path fill="currentColor" d="M3 7.5l4.5 4 4.5-7 4.5 7 4.5-4-2 10.5H5z"/><rect fill="currentColor" x="5" y="19" width="14" height="2" rx="1"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.2"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></g></symbol>
+  <symbol id="i-bars" viewBox="0 0 24 24"><g fill="currentColor"><rect x="3" y="13" width="4" height="8" rx="1"/><rect x="10" y="8" width="4" height="13" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></g></symbol>
+  <symbol id="i-export" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7.5 7.5L12 3l4.5 4.5"/><path d="M5 11v8.5h14V11"/></g></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 12l9 5 9-5M3 16l9 5 9-5"/></g></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path fill="currentColor" d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2h8.5A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></symbol>
+  <symbol id="i-chev-down" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-chev-left" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-chev-right" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></symbol>
+  <symbol id="i-start" viewBox="0 0 24 24"><path fill="currentColor" d="M6 5h2.5v14H6zM20 5v14L9.5 12z"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path fill="currentColor" d="M7 4.5v15L19.5 12z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path fill="currentColor" d="M6.5 5h4v14h-4zM13.5 5h4v14h-4z"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect fill="currentColor" x="6" y="6" width="12" height="12" rx="1.5"/></symbol>
+  <symbol id="i-loop" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8H7.5a3.5 3.5 0 0 0 0 7H9"/><path d="M14.5 5.5L17 8l-2.5 2.5"/><path d="M7 16h9.5a3.5 3.5 0 0 0 0-7H15"/><path d="M9.5 18.5L7 16l2.5-2.5"/></g></symbol>
+  <symbol id="i-phones" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3.5" y="14" width="4" height="6" rx="1.5" fill="currentColor"/><rect x="16.5" y="14" width="4" height="6" rx="1.5" fill="currentColor"/></g></symbol>
+  <symbol id="i-speaker" viewBox="0 0 24 24"><path fill="currentColor" d="M4 9h3.5L12 5v14l-4.5-4H4z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M15 9a4 4 0 0 1 0 6M17.5 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
+  <symbol id="i-metronome" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M9 3h6l3.5 18h-13z"/><path d="M12 16l5-9"/><path d="M7 16h10"/></g></symbol>
+  <symbol id="i-fork" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 3v7a4 4 0 0 0 8 0V3M12 14v7M9 21h6"/></g></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4.5l3 2M9.5 2.5h5"/></g></symbol>
+  <symbol id="i-gem" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M6 4h12l4 5-10 11L2 9z"/><path d="M2 9h20M9 4l3 16 3-16"/></g></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path fill="currentColor" d="M13.5 2L4.5 13.5h6L9 22l10-12.5h-6.5z"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2.5l2.9 6.2 6.6.7-5 4.5 1.5 6.6L12 17.2 6 20.5l1.5-6.6-5-4.5 6.6-.7z"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7H15a5 5 0 0 1 0 10H8"/><path d="M11.5 4L8.5 7l3 3"/></g></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7H9a5 5 0 0 0 0 10h7"/><path d="M12.5 4l3 3-3 3"/></g></symbol>
+  <symbol id="i-wand" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 20L15 9"/><path d="M14 4v3M12.5 5.5h3M19 8v3M17.5 9.5h3M18 2.5v2M17 3.5h2"/></g></symbol>
+  <symbol id="i-swap" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h15M15.5 4.5L19 8l-3.5 3.5"/><path d="M20 16H5M8.5 12.5L5 16l3.5 3.5"/></g></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><g fill="currentColor"><rect x="3" y="5" width="3" height="2.4" rx=".6"/><rect x="8" y="5" width="13" height="2.4" rx=".6"/><rect x="3" y="10.8" width="3" height="2.4" rx=".6"/><rect x="8" y="10.8" width="13" height="2.4" rx=".6"/><rect x="3" y="16.6" width="3" height="2.4" rx=".6"/><rect x="8" y="16.6" width="13" height="2.4" rx=".6"/></g></symbol>
+  <symbol id="i-paste" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="5" y="4.5" width="14" height="16.5" rx="2"/><path d="M9 4.5V3h6v1.5M8.5 10h7M8.5 13.5h7M8.5 17h4.5"/></g></symbol>
+  <symbol id="i-ear" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M7 9a5.5 5.5 0 0 1 11 0c0 3-2.5 4-3.5 5.5S14 19 11.5 20.5 8 19.5 8 18"/><path d="M10 9.5a2.5 2.5 0 0 1 5 0c0 1.2-1 1.7-1.5 2.4"/></g></symbol>
+  <symbol id="i-song" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 18V5.5l11-2V16"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></g></symbol>
+  <symbol id="i-wave" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M2 12h3l2-5 3 11 3-14 3 12 2-4h4"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 7h18M3 12h18M3 17h18"/></g><g fill="currentColor"><rect x="6" y="5" width="3" height="4" rx="1"/><rect x="14" y="10" width="3" height="4" rx="1"/><rect x="9" y="15" width="3" height="4" rx="1"/></g></symbol>
+  <symbol id="i-ext" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M7 17L17 7M9 7h8v8"/></symbol>
+  <symbol id="i-drag" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13M7.5 11.5L12 16l4.5-4.5"/><path d="M4 18v2.5h16V18"/></g></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></g></symbol>
+  <symbol id="i-width" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M8 8.5a5 5 0 0 0 0 7M16 8.5a5 5 0 0 1 0 7M5 6a8.5 8.5 0 0 0 0 12M19 6a8.5 8.5 0 0 1 0 12"/></g></symbol>
+  <symbol id="i-level" viewBox="0 0 24 24"><g fill="currentColor"><rect x="4" y="13" width="3.5" height="7"/><rect x="10" y="9" width="3.5" height="11"/><rect x="16" y="4" width="3.5" height="16"/></g></symbol>
+  <symbol id="i-pulse" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M2 12h4l2-6 3 12 3-9 2 3h6"/></symbol>
+  <symbol id="i-bulb" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 17h6M10 20.5h4M12 3a6 6 0 0 0-3.5 10.9V17h7v-3.1A6 6 0 0 0 12 3z"/></g></symbol>
+
+  <!-- Compass rose (drawn, so it stays crisp at any size) -->
+  <symbol id="compass" viewBox="0 0 200 200">
+    <circle cx="100" cy="100" r="96" fill="url(#g-compass-glow)"/>
+    <circle cx="100" cy="100" r="62" fill="none" stroke="currentColor" stroke-opacity=".25" stroke-width="1"/>
+    <circle cx="100" cy="100" r="74" fill="none" stroke="currentColor" stroke-opacity=".12" stroke-width="1"/>
+    <g opacity=".75">
+      <path d="M100 100L70 70 100 88z" fill="url(#g-gold-h)"/><path d="M100 100L130 70 112 100z" fill="url(#g-gold-h)"/>
+      <path d="M100 100L130 130 100 112z" fill="url(#g-gold-h)"/><path d="M100 100L70 130 88 100z" fill="url(#g-gold-h)"/>
+    </g>
+    <path d="M100 6L111 89 100 100 89 89z" fill="url(#g-gold)"/>
+    <path d="M100 6L100 100 89 89z" fill="#fff4c4" opacity=".55"/>
+    <path d="M100 194L111 111 100 100 89 111z" fill="url(#g-gold-h)"/>
+    <path d="M194 100L111 111 100 100 111 89z" fill="url(#g-gold-h)"/>
+    <path d="M6 100L89 89 100 100 89 111z" fill="url(#g-gold)"/>
+    <path d="M6 100L100 100 89 89z" fill="#fff4c4" opacity=".4"/>
+    <circle cx="100" cy="100" r="3.5" fill="#fff1b0"/>
+  </symbol>
+</svg>
+
+<script src="js/bridge.js"></script>
+<script src="js/demo.js"></script>
+<script src="js/wave.js"></script>
+<script src="js/manual.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

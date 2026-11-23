@@ -1,0 +1,28 @@
+COMP CAPTAIN - HOW TO INSTALL
+=============================
+
+This version is M0: the look. It shows the full interface with a made-up song and made-up takes so you can
+try the pages. On your track it passes your audio through untouched.
+
+WINDOWS (Cubase and other DAWs)
+1. Close your DAW.
+2. Copy the folder "Comp Captain.vst3" into:  C:\Program Files\Common Files\VST3
+   (Windows may ask for permission: click Continue.)
+3. Open your DAW. In Cubase, if it doesn't show up, open Studio > VST Plug-in Manager and click Rescan.
+4. Put Comp Captain on a vocal track as an insert effect, then open it.
+   "Comp Captain.exe" is the standalone version: double-click it to try it without a DAW.
+
+MAC
+1. Copy "Comp Captain.vst3" into  /Library/Audio/Plug-Ins/VST3
+   and "Comp Captain.component" into  /Library/Audio/Plug-Ins/Components
+2. Open your DAW and rescan plug-ins if needed.
+   (These test builds are not signed yet: if macOS blocks it, right-click > Open, or allow it in
+   System Settings > Privacy & Security.)
+
+LINUX
+Copy "Comp Captain.vst3" into  ~/.vst3
+
+TIPS
+- Click the logo to switch between the light and dark look.
+- Drag the window's corner to make it bigger or smaller, or use the gear (settings) button.
+- The ? button opens the manual.
