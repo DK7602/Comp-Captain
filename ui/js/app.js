@@ -35,7 +35,7 @@
     align: JSON.parse(JSON.stringify(D.alignDefaults)),
     exportOn: {},
     sonicology: { voxology: 'installed', mixology: 'installed' },
-    version: '0.2.0', host: 'Browser preview',
+    version: '0.2.1', host: 'Browser preview',
     level: 0,
   };
   if (!PAGES.includes(S.page)) S.page = 'comp';
@@ -143,6 +143,15 @@
       }
       ctx.stroke();
     };
+    if (S.theme === 'light') {
+      // On white the glow can't glow: a calmer blue wave that stops short of the logo, and no gold bits
+      // peeking out between the logo and the title (they looked like stray specks).
+      group(10, 180, 'rgba(40,120,230,.70)', true);
+      ctx.shadowBlur = 0;
+      const g = ctx.createLinearGradient(0, 0, 190, 0); g.addColorStop(0, 'rgba(40,120,230,0)'); g.addColorStop(1, 'rgba(40,120,230,.55)');
+      ctx.strokeStyle = g; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(180, mid); ctx.stroke();
+      return;
+    }
     group(10, 205, 'rgba(70,170,255,.85)', true);     // left of the logo
     group(360, 440, 'rgba(255,190,60,.75)', false);   // between logo and title
     ctx.shadowBlur = 0;
