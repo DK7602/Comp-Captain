@@ -50,12 +50,46 @@ namespace
         return identical;
     }
 
-    juce::String stateText (juce::AudioPluginInstance& plugin)
+    // A DAW keeps the plug-in's saved data inside its own wrapper (XML with the component state in
+    // base64). These unwrap and rewrap it, so we can read and change our own text inside.
+    std::string componentState (juce::AudioPluginInstance& plugin)
     {
-        juce::MemoryBlock block;
-        plugin.getStateInformation (block);
-        return block.toString();
+        juce::MemoryBlock host;
+        plugin.getStateInformation (host);
+        juce::MemoryBlock component;
+        if (auto xml = juce::AudioProcessor::getXmlFromBinary (host.getData(), (int) host.getSize()))
+            if (auto* c = xml->getChildByName ("IComponent"))
+                component.fromBase64Encoding (c->getAllSubText());
+        return { static_cast<const char*> (component.getData()), component.getSize() };
     }
+
+    void setComponentState (juce::AudioPluginInstance& plugin, const std::string& component)
+    {
+        juce::MemoryBlock host;
+        plugin.getStateInformation (host);
+        auto xml = juce::AudioProcessor::getXmlFromBinary (host.getData(), (int) host.getSize());
+        if (xml == nullptr)
+            return;
+        if (auto* c = xml->getChildByName ("IComponent"))
+        {
+            c->deleteAllTextElements();
+            c->addTextElement (juce::MemoryBlock (component.data(), component.size()).toBase64Encoding());
+        }
+        juce::MemoryBlock out;
+        juce::AudioProcessor::copyXmlToBinary (*xml, out);
+        plugin.setStateInformation (out.getData(), (int) out.getSize());
+    }
+
+    bool replace (std::string& s, const std::string& from, const std::string& to)
+    {
+        const auto at = s.find (from);
+        if (at == std::string::npos)
+            return false;
+        s.replace (at, from.size(), to);
+        return true;
+    }
+
+    bool has (const std::string& s, const char* what) { return s.find (what) != std::string::npos; }
 }
 
 int main (int argc, char** argv)
@@ -98,27 +132,32 @@ int main (int argc, char** argv)
     check (passesAudioUntouched (*plugin, 1), "mono audio passes through bit for bit");
 
     // 4. Save and restore
-    const juce::String saved = "CompCaptainState\ncompcaptain-ui=1\ntheme=light\npage=review\ncompView=song\nwindowScale=1.00\n";
-    plugin->setStateInformation (saved.toRawUTF8(), (int) saved.getNumBytesAsUTF8());
-    check (stateText (*plugin) == saved, "saves exactly what it restored");
+    auto saved = componentState (*plugin);
+    check (saved.rfind ("CompCaptainState\n", 0) == 0 && has (saved, "page=comp") && has (saved, "theme=dark"),
+           "saves its state with the project (opens on the Comp page, dark look)");
+
+    auto changed = saved;
+    const bool edited = replace (changed, "theme=dark", "theme=light") && replace (changed, "page=comp", "page=review")
+                        && replace (changed, "compView=line", "compView=song") && replace (changed, "windowScale=0.80", "windowScale=1.00");
+    check (edited, "found the look, page and window size in the saved state");
 
     auto second = formats.createPluginInstance (desc, 48000.0, 512, error);
     check (second != nullptr, "a second copy loads");
     if (second != nullptr)
     {
-        juce::MemoryBlock block;
-        plugin->getStateInformation (block);
-        second->setStateInformation (block.getData(), (int) block.getSize());
-        check (stateText (*second) == saved, "a second copy restores the saved project");
-        const juce::String junk = "not our state at all";
-        second->setStateInformation (junk.toRawUTF8(), (int) junk.length());
-        check (stateText (*second) == saved, "ignores state that isn't ours");
+        setComponentState (*second, changed);
+        const auto restored = componentState (*second);
+        check (has (restored, "theme=light") && has (restored, "page=review") && has (restored, "compView=song") && has (restored, "windowScale=1.00"),
+               "restores a saved project (light look, Review page, Song view, full size)");
+
+        setComponentState (*second, "not our state at all");
+        check (has (componentState (*second), "theme=light"), "ignores state that isn't ours");
     }
 
     // 5. Open the window (the web interface), at the saved size, and let it load
     if (openWindow)
     {
-        std::unique_ptr<juce::AudioProcessorEditor> editor (plugin->createEditorAndMakeActive());
+        std::unique_ptr<juce::AudioProcessorEditor> editor (second != nullptr ? second->createEditorAndMakeActive() : nullptr);
         check (editor != nullptr, "opens its window");
         if (editor != nullptr)
         {
@@ -126,7 +165,7 @@ int main (int argc, char** argv)
                    "window opens at the saved size (got " + juce::String (editor->getWidth()) + " x " + juce::String (editor->getHeight()) + ")");
             check (editor->isResizable(), "window can be resized");
             editor->setTopLeftPosition (40, 40);
-            editor->addToDesktop (juce::ComponentPeer::windowHasTitleBar);
+            editor->addToDesktop (0);
             editor->setVisible (true);
             juce::MessageManager::getInstance()->runDispatchLoopUntil (5000);
             check (editor->isShowing(), "window stays open while the interface loads");
