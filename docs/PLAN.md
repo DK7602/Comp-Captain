@@ -172,11 +172,12 @@ and one big gold button for the page's main job.
 stay sharp on high-resolution screens. The sound-wave glow behind the logo and the compass rose are drawn in code
 (crisp at any size, both looks). The logo's stray glow bits are erased. In the light look the tagline and the word
 "Assistant" get a soft navy shadow so they read on white; panels become frosted white glass with gold edges.
-**Light look art (2026-11-23, 0.2.1).** The owner found the light look's graphics messy (art drawn for a dark
-background). The light header now uses the owner's new combined art (`art/header-light.webp`: logo, sound waves,
-"COMP CAPTAIN" and the tagline in one picture, built by `art/make_header_light.py`); the logo button stays on top
-of its microphone. The light Assistant badge is cleaned (`art/make_assistant.py`); the owner also has a new
-Assistant badge to send as a file. The dark look is unchanged.
+**New header art (2026-11-23, 0.2.1).** The owner found the light look's graphics messy (art drawn for a dark
+background) and sent new art: `art/header.webp` (logo, sound waves, "COMP CAPTAIN" and the tagline in one picture,
+built into `ui/img/header.png` by `art/make_header.py`). It's the header in **both looks** (owner's choice); the
+logo button is a see-through click area over its microphone. The old logo, title and drawn header waves are gone
+(the originals stay in `art/`). The light Assistant badge is cleaned (`art/make_assistant.py`); the owner also has
+a new Assistant badge to send as a file.
 
 ## Milestones (each one ends with a test in Cubase)
 

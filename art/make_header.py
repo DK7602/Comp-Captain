@@ -1,5 +1,5 @@
-# Builds ui/img/header-light.png (the light look's logo, sound waves and title in one) from the owner's
-# art/header-light.webp: trimmed to what's visible, faint specks around it removed, sized for sharp
+# Builds ui/img/header.png (the logo, sound waves, title and tagline in one, both looks) from the owner's
+# art/header.webp: trimmed to what's visible, faint specks around it removed, sized for sharp
 # screens (2x the size it's shown at).
 #   python3 art/make_header_light.py      (needs Pillow, numpy, scipy)
 from PIL import Image
@@ -8,7 +8,7 @@ from scipy import ndimage
 
 SHOWN_HEIGHT = 132  # px on the 1672 x 941 stage (see .header-art in ui/css/app.css)
 
-im = np.array(Image.open('art/header-light.webp').convert('RGBA')).astype(float)
+im = np.array(Image.open('art/header.webp').convert('RGBA')).astype(float)
 a = im[:, :, 3]
 
 # faint specks: barely-there pixels, and small islands away from the artwork
@@ -27,5 +27,5 @@ out = Image.fromarray(np.clip(im, 0, 255).astype(np.uint8), 'RGBA').crop(box)
 height = SHOWN_HEIGHT * 2
 width = round(out.width * height / out.height)
 out = out.resize((width, height), Image.LANCZOS)
-out.save('ui/img/header-light.png', optimize=True)
+out.save('ui/img/header.png', optimize=True)
 print('cropped to', box, '->', out.size, '(shown at', round(width / 2), 'x', SHOWN_HEIGHT, ')')

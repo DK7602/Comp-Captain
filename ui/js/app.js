@@ -124,32 +124,8 @@
   function closeMenu() { if (openMenu) { openMenu.remove(); openMenu = null; } }
   document.addEventListener('pointerdown', (e) => { if (openMenu && !openMenu.contains(e.target)) closeMenu(); });
 
-  // ------------------------------------------------------------------ header glow (pulses with your voice)
-  const glow = $('#waveglow');
+  // the Record page's level meter follows your voice
   let glowLevel = 0;
-  function drawGlow() {
-    const p = Wave.prep(glow); if (!p) return;
-    const { ctx, w, h: hh } = p, mid = hh / 2 - 2;
-    const lvl = 0.62 + 0.38 * glowLevel;
-    const group = (x0, x1, color, fadeIn) => {
-      ctx.strokeStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 8; ctx.lineWidth = 2.2;
-      ctx.beginPath();
-      for (let x = x0; x <= x1; x += 5) {
-        const f = (x - x0) / (x1 - x0);
-        const env = fadeIn ? Math.sin(Math.PI * Math.pow(f, 0.8)) * f : Math.sin(Math.PI * f) * (1 - f * 0.6);
-        const n = 0.35 + 0.65 * Wave.hash(Math.floor(x / 5) * 3.1);
-        const a = Math.max(2, env * n * 46 * lvl);
-        ctx.moveTo(x, mid - a); ctx.lineTo(x, mid + a);
-      }
-      ctx.stroke();
-    };
-    if (S.theme === 'light') return; // the light look's header art has its own sound waves
-    group(10, 205, 'rgba(70,170,255,.85)', true);     // left of the logo
-    group(360, 440, 'rgba(255,190,60,.75)', false);   // between logo and title
-    ctx.shadowBlur = 0;
-    const g = ctx.createLinearGradient(0, 0, 220, 0); g.addColorStop(0, 'rgba(70,170,255,0)'); g.addColorStop(1, 'rgba(120,200,255,.8)');
-    ctx.strokeStyle = g; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(205, mid); ctx.stroke();
-  }
 
   // ------------------------------------------------------------------ theme + pages
   function setTheme(t, tell) {
@@ -689,7 +665,7 @@
     movePlayheads();
     if (S.page === 'record' && now - lastRec > 60) { lastRec = now; renderRecordLive(); }
     if (real() && S.page === 'record') T.drawRecord($('#rec-canvas'), $('#rec-bars'));
-    if (!Bridge.inHost) { glowLevel = S.playing ? Math.max(0, D.vocalEnvelope(S.time, 222, 0)) : 0; setMeter(glowLevel); drawGlow(); }
+    if (!Bridge.inHost) { glowLevel = S.playing ? Math.max(0, D.vocalEnvelope(S.time, 222, 0)) : 0; setMeter(glowLevel); }
     if (S.playing) raf = requestAnimationFrame(tick);
   }
   function renderLyricBarText() {
@@ -743,7 +719,7 @@
     if (redrawQueued) return; redrawQueued = true;
     requestAnimationFrame(() => {
       redrawQueued = false;
-      drawGlow(); renderLyricBar(); renderComp(); renderRecord(); renderTighten();
+      renderLyricBar(); renderComp(); renderRecord(); renderTighten();
     });
   }
 
@@ -868,7 +844,7 @@
     const db = v > 0 ? 20 * Math.log10(v) : -100;
     const n = Math.max(0, Math.min(1, (db + 48) / 48));
     if (Math.abs(n - glowLevel) < 0.01 && n < 0.01) return;
-    glowLevel = n; setMeter(n); drawGlow();
+    glowLevel = n; setMeter(n);
   });
 
   // ------------------------------------------------------------------ real takes changed (takes.js)

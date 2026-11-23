@@ -99,16 +99,11 @@ svg { display: block; }
 /* ---------- Header ---------- */
 #header { position: absolute; left: 0; top: 0; width: 1672px; height: 122px; z-index: 3; pointer-events: none; }
 #header > * { pointer-events: auto; }
-#waveglow { position: absolute; left: 190px; top: 8px; width: 1100px; height: 110px; pointer-events: none; }
-.logo { position: absolute; left: 388px; top: -2px; width: 166px; height: 130px; border: 0; padding: 0; background: none; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, .45)); }
-.logo img { width: 100%; height: 100%; object-fit: contain; }
-.logo:hover img { filter: brightness(1.08) drop-shadow(0 0 8px rgba(255, 200, 60, .55)); }
-/* light look: the owner's light header art (logo, sound waves and title in one picture); the logo button
-   stays on top of its microphone as a see-through click area */
-.header-art { position: absolute; left: 313px; top: -2px; width: 739px; height: 132px; pointer-events: none; }
-#stage[data-theme="light"] .title, #stage[data-theme="light"] #waveglow { display: none; }
-#stage[data-theme="light"] .logo { filter: none; }
-.title { position: absolute; left: 548px; top: 4px; width: 590px; height: auto; filter: var(--logo-shadow); }
+/* The owner's header art (logo, sound waves, title and tagline in one picture), in both looks.
+   The logo button is a see-through click area over its microphone (click = light / dark). */
+.logo { position: absolute; left: 388px; top: -2px; width: 166px; height: 130px; border: 0; padding: 0; background: none; cursor: pointer; }
+#header > .header-art { position: absolute; left: 313px; top: -2px; width: 739px; height: 132px; pointer-events: none; transition: filter .15s; }
+.logo:hover + .header-art { filter: brightness(1.06) drop-shadow(0 0 6px rgba(255, 200, 60, .45)); }
 .script { position: absolute; left: 1206px; top: 14px; width: 266px; filter: var(--logo-shadow); }
 .corner-btns { position: absolute; right: 22px; top: 12px; display: flex; gap: 8px; }
 .icon-btn {
