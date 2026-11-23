@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 
 # The version lives here (and only here). It shows in the DAW, the ⚙ window and the manual.
-project(CompCaptain VERSION 0.1.1 LANGUAGES C CXX)
+project(CompCaptain VERSION 0.2.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -32,6 +32,17 @@ if(CC_BUILD_PLUGIN)
         GIT_TAG        8.0.15
         GIT_SHALLOW    TRUE)
     FetchContent_MakeAvailable(JUCE)
+
+    # ARA SDK (Apache 2.0): lets Comp Captain work as a Cubase Extension on the track's lanes.
+    # Only its headers and library sources are used (SOURCE_SUBDIR points nowhere so nothing else builds).
+    FetchContent_Declare(ARA_SDK
+        GIT_REPOSITORY https://github.com/Celemony/ARA_SDK.git
+        GIT_TAG        releases/2.3.0
+        GIT_SHALLOW    TRUE
+        GIT_SUBMODULES ARA_API ARA_Library
+        SOURCE_SUBDIR  not-built)
+    FetchContent_MakeAvailable(ARA_SDK)
+    juce_set_ara_sdk_path("${ara_sdk_SOURCE_DIR}")
 
     add_subdirectory(plugin)
     add_subdirectory(host-test)

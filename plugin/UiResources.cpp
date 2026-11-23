@@ -1,6 +1,7 @@
 #include "UiResources.h"
 
 #include "BinaryData.h"
+#include "cc/UiFiles.h"
 
 #include <cstring>
 
@@ -17,17 +18,7 @@ int UiResources::numFiles() const
 
 juce::String UiResources::mimeTypeFor (const juce::String& path)
 {
-    const auto ext = path.fromLastOccurrenceOf (".", false, false).toLowerCase();
-    if (ext == "html") return "text/html";
-    if (ext == "css") return "text/css";
-    if (ext == "js") return "text/javascript";
-    if (ext == "json") return "application/json";
-    if (ext == "png") return "image/png";
-    if (ext == "jpg" || ext == "jpeg") return "image/jpeg";
-    if (ext == "svg") return "image/svg+xml";
-    if (ext == "woff2") return "font/woff2";
-    if (ext == "woff") return "font/woff";
-    return "application/octet-stream";
+    return juce::String (cc::mimeTypeFor (path.toStdString()));
 }
 
 std::optional<juce::WebBrowserComponent::Resource> UiResources::get (const juce::String& url) const

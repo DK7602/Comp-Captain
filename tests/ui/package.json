@@ -1,0 +1,7 @@
+{
+  "name": "comp-captain-ui-test",
+  "private": true,
+  "description": "Checks the window's messages to and from the plug-in in a real browser.",
+  "scripts": { "test": "node bridge-test.js" },
+  "devDependencies": { "playwright": "1.63.0" }
+}

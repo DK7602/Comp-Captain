@@ -6,10 +6,14 @@ FetchContent_Declare(Catch2
 FetchContent_MakeAvailable(Catch2)
 
 add_executable(cc_tests
-    UiStateTests.cpp
+    CaptureTests.cpp
     PeakMeterTests.cpp
+    SongTimeTests.cpp
     SuiteDetectorTests.cpp
+    TakeTests.cpp
     UiFilesTests.cpp
+    UiStateTests.cpp
+    WavFileTests.cpp
 )
 target_link_libraries(cc_tests PRIVATE cc_engine Catch2::Catch2WithMain)
 target_compile_definitions(cc_tests PRIVATE CC_SOURCE_DIR="${PROJECT_SOURCE_DIR}")

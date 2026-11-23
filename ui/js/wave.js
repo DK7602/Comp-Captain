@@ -22,7 +22,9 @@ const Wave = (() => {
   function hash(n) { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
 
   /**
-   * opts: t0, t1 (seconds shown), env(t) -> 0..1, color (string or fn(t)), seed, gain, step (px), glow (px), alpha
+   * opts: t0, t1 (the time shown: seconds, or quarter notes for real takes), env(t, dt) -> 0..1 for the column
+   * from t to t + dt (-1 = nothing there: no line), color (string or fn(t)), seed, gain, step (px), glow (px),
+   * alpha, noise (false = draw the levels exactly, for real takes)
    */
   // Drawn on the screen's real pixels: sharp 1-pixel lines on top, with a separate soft glow
   // underneath, so the waves stay crisp at any window size.
@@ -38,16 +40,20 @@ const Wave = (() => {
 
     // work out the columns once
     const cols = [];
+    const dt = (opts.t1 - opts.t0) * step / W;
     for (let X = 0; X <= W; X += step) {
       const t = opts.t0 + (X / W) * (opts.t1 - opts.t0);
-      const n = 0.45 + 0.55 * hash(Math.floor(X / step) + (opts.seed || 0) * 977);
-      cols.push({ x: X + 0.5, a: Math.max(0.5, Math.min(1, opts.env(t) * n) * (H / 2) * gain), c: colorAt(t) });
+      const e = opts.env(t, dt);
+      if (e < 0) { cols.push({ x: X + 0.5, skip: true }); continue; }
+      const n = opts.noise === false ? 1 : 0.45 + 0.55 * hash(Math.floor(X / step) + (opts.seed || 0) * 977);
+      cols.push({ x: X + 0.5, a: Math.max(0.5, Math.min(1, e * n) * (H / 2) * gain), c: colorAt(t) });
     }
     const stroke = (width, a, blur) => {
       ctx.lineWidth = width; ctx.globalAlpha = alpha * a; ctx.shadowBlur = blur;
       let last = null;
       ctx.beginPath();
       for (const col of cols) {
+        if (col.skip) continue;
         if (col.c !== last) {
           if (last !== null) ctx.stroke();
           ctx.beginPath(); ctx.strokeStyle = col.c; ctx.shadowColor = col.c; last = col.c;
@@ -62,9 +68,16 @@ const Wave = (() => {
     ctx.lineCap = 'butt';
     if (opts.glow !== 0) stroke(Math.max(2, step), 0.35, (opts.glow || 6) * k); // soft halo
     stroke(Math.max(1, Math.round(k * 0.9)), 1, 0);                            // sharp lines
-    // thin bright centre line like the art
-    ctx.shadowBlur = 0; ctx.globalAlpha = alpha * 0.6; ctx.strokeStyle = colorAt(opts.t0); ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(W, mid); ctx.stroke();
+    // thin bright centre line like the art (only where there's sound, for real takes)
+    ctx.shadowBlur = 0; ctx.globalAlpha = alpha * 0.6; ctx.lineWidth = 1;
+    ctx.beginPath();
+    let open = null;
+    for (const col of cols) {
+      if (col.skip) { if (open !== null) { ctx.lineTo(col.x, mid); open = null; } continue; }
+      if (open === null) { ctx.moveTo(col.x, mid); ctx.strokeStyle = col.c; open = col.x; }
+    }
+    if (open !== null) ctx.lineTo(W, mid);
+    ctx.stroke();
     ctx.restore();
     return p;
   }

@@ -1,4 +1,5 @@
-// Comp Captain interface: pages, made-up takes (M0), light / dark, manual and settings.
+// Comp Captain interface: pages, light / dark, manual and settings. Real takes (M1) come from takes.js;
+// the parts that need lyrics and scores (M2, M3) still show a sample song, clearly marked.
 'use strict';
 
 (() => {
@@ -11,6 +12,9 @@
 
   const stage = $('#stage');
   const D = Demo;
+  const T = Takes, TS = Takes.st;
+  const real = () => TS.real;
+  if (real()) stage.dataset.real = '1';
   const PAGES = ['record', 'lyrics', 'comp', 'tighten', 'review', 'export'];
 
   // ------------------------------------------------------------------ state
@@ -31,7 +35,7 @@
     align: JSON.parse(JSON.stringify(D.alignDefaults)),
     exportOn: {},
     sonicology: { voxology: 'installed', mixology: 'installed' },
-    version: '0.1.1', host: 'Browser preview',
+    version: '0.2.0', host: 'Browser preview',
     level: 0,
   };
   if (!PAGES.includes(S.page)) S.page = 'comp';
@@ -73,11 +77,11 @@
 
   // ------------------------------------------------------------------ toast
   let toastTimer = 0;
-  function toast(text) {
+  function toast(text, ms) {
     const t = $('#toast'); t.textContent = text; t.hidden = false;
-    clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 2600);
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, ms || 2600);
   }
-  const soon = (what, milestone) => toast(`${what} arrives in ${milestone}. This version is the look only.`);
+  const soon = (what, milestone) => toast(`${what} arrives in ${milestone}.`);
 
   // ------------------------------------------------------------------ small widgets
   function bindSlider(el, onChange) {
@@ -102,15 +106,20 @@
     closeMenu();
     const r = anchor.getBoundingClientRect(), sr = stage.getBoundingClientRect(), k = sr.width / 1672;
     const m = h('div', 'panel menu');
-    Object.assign(m.style, { left: (r.left - sr.left) / k + 'px', top: (r.bottom - sr.top) / k + 4 + 'px', minWidth: r.width / k + 'px', zIndex: 40, padding: '6px' });
-    items.forEach((it) => {
-      const b = h('button', 'menu-item', it);
-      Object.assign(b.style, { display: 'block', width: '100%', textAlign: 'left', border: '0', background: 'none', padding: '7px 10px', fontSize: '17px', borderRadius: '5px' });
-      b.onmouseenter = () => { b.style.background = 'rgba(255,200,60,.18)'; }; b.onmouseleave = () => { b.style.background = 'none'; };
-      b.onclick = (e) => { e.stopPropagation(); closeMenu(); onPick(it); };
+    Object.assign(m.style, { left: (r.left - sr.left) / k + 'px', top: (r.bottom - sr.top) / k + 4 + 'px', minWidth: Math.max(160, r.width / k) + 'px', zIndex: 40, padding: '6px' });
+    items.forEach((raw) => {
+      const it = typeof raw === 'string' ? { label: raw, value: raw } : raw;
+      if (it.header) { m.appendChild(h('div', 'menu-head', escapeHtml(it.label))); return; }
+      const b = h('button', 'menu-item' + (it.checked ? ' checked' : ''), (it.color ? `<i class="menu-dot" style="background:${it.color}"></i>` : '') + escapeHtml(it.label));
+      b.onclick = (e) => { e.stopPropagation(); closeMenu(); onPick(typeof raw === 'string' ? raw : it); };
       m.appendChild(b);
     });
     stage.appendChild(m); openMenu = m;
+    // keep it on the stage
+    const over = m.offsetTop + m.offsetHeight - 930;
+    if (over > 0) m.style.top = Math.max(8, m.offsetTop - over) + 'px';
+    const right = m.offsetLeft + m.offsetWidth - 1664;
+    if (right > 0) m.style.left = Math.max(8, m.offsetLeft - right) + 'px';
   }
   function closeMenu() { if (openMenu) { openMenu.remove(); openMenu = null; } }
   document.addEventListener('pointerdown', (e) => { if (openMenu && !openMenu.contains(e.target)) closeMenu(); });
@@ -229,17 +238,17 @@
     const li = S.line, ln = D.lines[li], chosen = S.choice[li];
     const sec = D.sections[ln.section];
     $('#li-count').textContent = `Line ${li + 1} of ${D.lines.length} | ${sec.name}`;
-    $('#li-text').textContent = `“${ln.text}”`;
-    $('#track-name').textContent = $('#track-name').dataset.custom || `Vocal – Lead (${sec.name})`;
+    $('#li-text').textContent = `\u201C${ln.text}\u201D`;
+    $('#track-name').textContent = real() ? T.trackLabel() : ($('#track-name').dataset.custom || `Vocal \u2013 Lead (${sec.name})`);
 
     // Line view
     const rows = $('#take-rows'); rows.innerHTML = '';
     D.takes.forEach((tk, ti) => {
       const sc = D.scores[li][ti];
       const r = h('div', 'take-row' + (ti === chosen ? ' chosen' : ''));
-      r.innerHTML = `<span class="check">✓</span><button class="sq" title="Hear this take">${icon('i-play')}</button>
-        <span class="name">${tk.name}</span>${tk.fav ? '<span class="fav" title="Favourite">♥</span>' : ''}<canvas></canvas>
-        <span class="warn-badge" title="${sc.warn || ''}">${sc.warn ? '⚠' : ''}</span>
+      r.innerHTML = `<span class="check">\u2713</span><button class="sq" title="Hear this take">${icon('i-play')}</button>
+        <span class="name">${tk.name}</span>${tk.fav ? '<span class="fav" title="Favourite">\u2665</span>' : ''}<canvas></canvas>
+        <span class="warn-badge" title="${sc.warn || ''}">${sc.warn ? '\u26A0' : ''}</span>
         <div class="scores">${scoreCell(sc.p)}${scoreCell(sc.t)}${scoreCell(sc.c)}${scoreCell(sc.e, 'e')}<div class="total">${Math.round(total(sc, S.weights))}%</div></div>`;
       r.onclick = (e) => {
         if (e.target.closest('.sq')) { S.time = ln.start; play(true); return; }
@@ -249,6 +258,16 @@
       const cv = $('canvas', r);
       Wave.draw(cv, { t0: ln.start - 0.25, t1: ln.end + 0.25, env: (t) => D.vocalEnvelope(t, tk.seed, tk.shift), color: tk.color, seed: tk.seed, step: 1.5, glow: 6 });
     });
+
+    // Real takes: the Song view shows every take on the song's bars (the Line view needs lyrics + scores)
+    if (real()) {
+      T.drawLanes($('#lanes'), $('#lane-lyrics'));
+      renderBestCompNote();
+      renderScorePanel();
+      movePlayheads();
+      return;
+    }
+    $('#lane-lyrics').classList.remove('bar-ruler');
 
     // Song view: the lines of the current section
     const secLines = D.lines.filter((l) => l.section === ln.section);
@@ -264,7 +283,7 @@
     const lanes = $('#lanes'); lanes.innerHTML = '';
     D.takes.forEach((tk, ti) => {
       const lane = h('div', 'lane');
-      lane.innerHTML = `<div class="lane-name">${icon('i-play')}<span>${tk.name}</span><span class="dot" style="color:${tk.color}"></span></div><canvas></canvas><button class="more" title="More">•••</button>`;
+      lane.innerHTML = `<div class="lane-name">${icon('i-play')}<span>${tk.name}</span><span class="dot" style="color:${tk.color}"></span></div><canvas></canvas><button class="more" title="More">\u2022\u2022\u2022</button>`;
       lanes.appendChild(lane);
       const cv = $('canvas', lane);
       Wave.draw(cv, { t0, t1, env: (t) => D.vocalEnvelope(t, tk.seed, tk.shift), color: tk.color, seed: tk.seed, step: 1.6, glow: 5 });
@@ -303,6 +322,10 @@
     renderScorePanel();
     movePlayheads();
   }
+  function renderBestCompNote() {
+    Wave.draw($('#bc-canvas'), { t0: 0, t1: 1, env: () => -1, color: '#ffc531', glow: 0, noise: false });
+    $('#bc-tags').innerHTML = '<div class="bc-note">Your best comp is built here from your real takes once lyrics (M2) and scores (M3) are in.</div>';
+  }
   function shade(hex) { const n = parseInt(hex.slice(1), 16); const f = (v) => Math.round(v * 0.45); return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`; }
 
   function renderScorePanel() {
@@ -332,7 +355,9 @@
   function renderRecord() {
     const sec = D.sections[S.recSection];
     $('#rec-section').textContent = sec.name;
-    $('#r-arm').classList.toggle('armed', S.armed);
+    const armed = real() ? TS.capture.armed : S.armed;
+    $('#r-arm').classList.toggle('armed', armed);
+    $('#r-arm').classList.toggle('recording', real() && TS.capture.recording);
     $('#rec-loop').classList.toggle('on', S.recLoop);
     $('#rec-click').classList.toggle('on', S.recClick);
     // teleprompter: the line being sung (or next one) in the middle
@@ -354,6 +379,7 @@
       if (b > 0 && b < beats) bars.appendChild(lab);
       const ln = h('i'); ln.style.left = x + '%'; bars.appendChild(ln);
     }
+    if (real()) { renderRecordReal(); renderSectionLists(); return; }
     drawRecWave();
     // takes list
     const list = $('#take-list'); list.innerHTML = '';
@@ -367,13 +393,26 @@
         row.classList.add('recording');
         row.innerHTML = `<span class="play">${icon('i-play')}</span><span class="nm">Take ${i + 1}</span><span class="rec-lbl">${S.playing ? 'RECORDING' : 'ARMED'}</span>`;
       } else {
-        row.innerHTML = `<span class="play">${icon('i-play')}</span><span class="nm">Take ${i + 1}</span><span class="empty">—</span>`;
+        row.innerHTML = `<span class="play">${icon('i-play')}</span><span class="nm">Take ${i + 1}</span><span class="empty">\u2014</span>`;
       }
       list.appendChild(row);
     }
     $('#takes-count').textContent = `(${D.takes.length})`;
     $('#rec-take').textContent = `Take ${D.takes.length + 1} of ${totalTakes}`;
     renderSectionLists();
+  }
+  function renderRecordReal() {
+    const t = TS.transport;
+    $('#rec-bpm').textContent = t.known ? String(Math.round(t.bpm * 100) / 100) : '\u2013';
+    $('#rec-sig').textContent = t.known ? `${t.num}/${t.den}` : '\u2013/\u2013';
+    $('#rec-key').textContent = '\u2013';
+    T.drawRecord($('#rec-canvas'), $('#rec-bars'));
+    T.renderList($('#take-list'));
+    $('#takes-count').textContent = `(${TS.list.length})`;
+    const live = TS.capture.recording && TS.capture.live;
+    const i = TS.list.findIndex((x) => x.id === TS.sel);
+    $('#rec-take').textContent = live ? `\u25CF ${live.name}` : (i >= 0 ? `${TS.list[i].name} (${i + 1}/${TS.list.length})` : 'No takes yet');
+    $('#rec-take').title = i >= 0 ? `${TS.list[i].name}: take ${i + 1} of ${TS.list.length}` : '';
   }
   // Long lines shrink so they always fit across the teleprompter.
   function fitPrompter() {
@@ -395,7 +434,7 @@
       D.sections.forEach((sec) => {
         if (sec.name === 'Intro' || sec.name === 'Outro' || seen.has(sec.name)) return; seen.add(sec.name);
         const on = id === '#sec-list' ? D.sections[S.recSection].name === sec.name : D.sections[D.lines[S.line].section].name === sec.name;
-        const r = h('div', 'sec-row' + (on ? ' on' : ''), `<span class="check">${on ? '✓' : ''}</span>${sec.name}`);
+        const r = h('div', 'sec-row' + (on ? ' on' : ''), `<span class="check">${on ? '\u2713' : ''}</span>${sec.name}`);
         r.onclick = () => {
           if (id === '#sec-list') { S.recSection = sec.id; S.time = sec.start; renderRecord(); movePlayheads(); }
           else { const first = D.lines.find((l) => l.section === sec.id); if (first) setLine(first.id, true); }
@@ -433,7 +472,7 @@
         const a = demo.start / D.length * 100, b = demo.end / D.length * 100;
         r.innerHTML = `<span class="t">${fmtShort(demo.start)}</span><span class="txt">${escapeHtml(it.text)}</span><span class="span"><i style="left:${a}%;width:${Math.max(2, b - a)}%"></i></span>`;
       } else {
-        r.innerHTML = `<span class="t">–</span><span class="txt">${escapeHtml(it.text)}</span><span class="dim small">not lined up yet</span>`;
+        r.innerHTML = `<span class="t">\u2013</span><span class="txt">${escapeHtml(it.text)}</span><span class="dim small">not lined up yet</span>`;
       }
       list.appendChild(r); n++;
     });
@@ -461,7 +500,7 @@
       if (S.layerOn[l.key] === undefined) S.layerOn[l.key] = l.on;
       if (S.layerDb[l.key] === undefined) S.layerDb[l.key] = l.db;
       const db = S.layerDb[l.key];
-      const r = h('div', 'lc', `<span class="check ${S.layerOn[l.key] ? 'on' : ''}">✓</span><span>${l.name}</span>${sliderHTML((db + 24) / 30)}<span class="row-val">${db.toFixed(1)} dB</span>`);
+      const r = h('div', 'lc', `<span class="check ${S.layerOn[l.key] ? 'on' : ''}">\u2713</span><span>${l.name}</span>${sliderHTML((db + 24) / 30)}<span class="row-val">${db.toFixed(1)} dB</span>`);
       $('.check', r).onclick = () => { S.layerOn[l.key] = !S.layerOn[l.key]; renderTighten(); };
       lc.appendChild(r);
       bindSlider($('.slider', r), (v) => { const d = Math.round((v * 30 - 24) * 2) / 2; S.layerDb[l.key] = d; $('.row-val', r).textContent = d.toFixed(1) + ' dB'; });
@@ -481,7 +520,7 @@
       const tight = tabOf ? S.align[tabOf][0][2] : 1;
       const miss = l === lead ? 0 : (S.ba === 'before' ? 0.045 : 0.045 * (1 - tight));
       const off = (k) => (Wave.hash(k * 7 + l.seed) - 0.5) * 2 * miss;
-      lane.innerHTML = `<div class="nm">${l.name}<small>${l.role}${l === lead ? '' : ' · ' + (S.layerOn[l.name] === false ? 'muted' : (S.ba === 'before' ? 'as recorded' : `within ${Math.max(2, Math.round(miss * 1000))} ms`))}</small></div><canvas></canvas>`;
+      lane.innerHTML = `<div class="nm">${l.name}<small>${l.role}${l === lead ? '' : ' \u00B7 ' + (S.layerOn[l.name] === false ? 'muted' : (S.ba === 'before' ? 'as recorded' : `within ${Math.max(2, Math.round(miss * 1000))} ms`))}</small></div><canvas></canvas>`;
       wrap.appendChild(lane);
       const env = (t) => {
         if (l.sparse) { const lnI = D.lines.findIndex((x) => t >= x.start && t <= x.end); if (lnI % 2 === 0) return 0.01; }
@@ -501,7 +540,7 @@
     const rows = $('#review-rows'); if (!rows) return; rows.innerHTML = '';
     D.lines.forEach((l, i) => {
       const ti = S.choice[i], sc = D.scores[i][ti], tk = D.takes[ti];
-      const r = h('div', 'rv', `<span class="n">${i + 1}</span><span class="sec">${D.sections[l.section].name}</span><span class="txt">${l.text}</span><span class="w" title="${sc.warn || ''}">${sc.warn ? '⚠' : ''}</span>
+      const r = h('div', 'rv', `<span class="n">${i + 1}</span><span class="sec">${D.sections[l.section].name}</span><span class="txt">${l.text}</span><span class="w" title="${sc.warn || ''}">${sc.warn ? '\u26A0' : ''}</span>
         <div class="cells"><span class="tg" style="background:linear-gradient(180deg,${tk.color},${shade(tk.color)})">T${ti + 1}</span><span>${sc.p}%</span><span>${sc.t}%</span><span>${sc.c}%</span><span>${sc.e}%</span><div class="total">${Math.round(total(sc, S.weights))}%</div></div>`);
       r.onclick = () => { setLine(i, true); setPage('comp', true); };
       rows.appendChild(r);
@@ -545,7 +584,7 @@
     ];
     files.forEach(([name, role, col], i) => {
       if (S.exportOn[name] === undefined) S.exportOn[name] = i !== 6;
-      const r = h('div', 'ex', `<span class="check ${S.exportOn[name] ? 'on' : ''}">✓</span><span>${name}</span><span class="role" style="color:${col}">${role}</span><span class="len">from bar 1.1</span><span class="len">${fmtShort(D.length)}</span>`);
+      const r = h('div', 'ex', `<span class="check ${S.exportOn[name] ? 'on' : ''}">\u2713</span><span>${name}</span><span class="role" style="color:${col}">${role}</span><span class="len">from bar 1.1</span><span class="len">${fmtShort(D.length)}</span>`);
       $('.check', r).onclick = () => { S.exportOn[name] = !S.exportOn[name]; renderExport(); renderFooter(); };
       rows.appendChild(r);
     });
@@ -576,11 +615,11 @@
     const ov = Math.round(D.lines.reduce((a, l, i) => a + total(D.scores[i][S.choice[i]], S.weights), 0) / D.lines.length);
     const flagged = D.lines.filter((l, i) => D.scores[i][S.choice[i]].warn).length;
     const msgs = {
-      record: [S.armed ? (S.playing ? `Recording Take ${D.takes.length + 1}` : `Armed: press Record in your DAW`) : 'Lyrics locked to the beat', ['Count-in on screen', 'Every pass becomes a take', 'Bar-stamped']],
+      record: real() ? T.status() : [S.armed ? (S.playing ? `Recording Take ${D.takes.length + 1}` : `Armed: press Record in your DAW`) : 'Lyrics locked to the beat', ['Count-in on screen', 'Every pass becomes a take', 'Bar-stamped']],
       lyrics: [`${D.lines.length} lines lined up with your takes`, ['4 sections found', `Lined up on ${D.takes.length} takes`, 'Line 7: check the end']],
       comp: [`Comp complete! Best of ${D.takes.length} takes, line by line.`, ['Strongest pitch & timing', 'Consistent tone', 'High energy', 'Joins in the breaths']],
       tighten: ['Layers are tight and in time with the lead.', ['Doubles within 12 ms', 'Ad-libs left natural', 'BV lined up', 'Guitars on the grid']],
-      review: [`Average score ${ov}%${flagged ? ` · ${flagged} line${flagged > 1 ? 's' : ''} to check` : ''}`, [`Style: ${S.style}`, 'Hearts win ties', 'Click a line to comp it']],
+      review: [`Average score ${ov}%${flagged ? ` \u00B7 ${flagged} line${flagged > 1 ? 's' : ''} to check` : ''}`, [`Style: ${S.style}`, 'Hearts win ties', 'Click a line to comp it']],
       export: [`Ready: ${Object.values(S.exportOn).filter(Boolean).length || 6} files, all from bar 1.1`, ['Named by role', 'Works in any DAW', 'Nothing sent online']],
     }[p];
     $('#msg-title').textContent = msgs[0];
@@ -588,22 +627,30 @@
 
     const ob = $('#opt-box'); ob.className = 'opt-box' + (p === 'record' ? ' record' : ''); ob.innerHTML = '';
     if (p === 'record') {
-      [['countIn', 'Count-in on screen', '(2 bars)'], ['loopTakes', 'Loop Takes', '(follows your DAW\'s loop)'], ['autoNext', 'Auto Next Take', '(after Stop)'], ['guide', 'Guide Vocal', '(hear your best take while you sing)']].forEach(([k, a, b]) => {
-        const o = h('div', 'opt', `<span class="check ${S.recOpts[k] ? 'on' : ''}">✓</span><div>${a}<small>${b}</small></div>`);
-        o.onclick = () => { S.recOpts[k] = !S.recOpts[k]; renderFooter(); };
+      if (real()) S.recOpts.loopTakes = TS.capture.loopTakes;
+      const opts = [['countIn', 'Count-in on screen', '(2 bars, arrives in M2)'], ['loopTakes', 'Loop Takes', '(each time your DAW\'s loop comes round)'],
+        real() ? ['folder', 'Takes Folder', '(open where your takes are saved)'] : ['autoNext', 'Auto Next Take', '(after Stop)'], ['guide', 'Guide Vocal', '(hear your best take while you sing, M4)']];
+      opts.forEach(([k, a, b]) => {
+        const mark = k === 'folder' ? `<span class="check folder">${icon('i-folder')}</span>` : `<span class="check ${S.recOpts[k] ? 'on' : ''}">\u2713</span>`;
+        const o = h('div', 'opt', `${mark}<div>${a}<small>${b}</small></div>`);
+        o.onclick = () => {
+          if (k === 'folder') { T.openFolder(); return; }
+          if (k === 'loopTakes' && real()) { T.setLoopTakes(!TS.capture.loopTakes); return; }
+          S.recOpts[k] = !S.recOpts[k]; renderFooter();
+        };
         ob.appendChild(o);
       });
     } else {
       const opts = {
         lyrics: ['Tips', 'i-bulb', ['Put [Verse 1] above a part to make a section', 'Drag a line\'s ends to fix where it sits', 'No lyrics? Hear It writes them for you']],
         comp: ['Comp Builder', 'i-target', ['Build from the highest-scoring takes', 'Keep the strongest feel & performance', 'Blend joins in the breaths (no clicks)']],
-        tighten: ['Suggestions (Optional)', 'i-bulb', ['Tighten doubles (−12 ms)', 'Match backing vocal level (+1.5 dB)', 'Line up Guitar Layer 2 with the grid']],
-        review: ['What the scores mean', 'i-bulb', ['Pitch: on the notes · Timing: on the beat', 'Clarity: words clear · Energy: delivery', '⚠ a pop, clip or loud breath was heard']],
+        tighten: ['Suggestions (Optional)', 'i-bulb', ['Tighten doubles (\u221212 ms)', 'Match backing vocal level (+1.5 dB)', 'Line up Guitar Layer 2 with the grid']],
+        review: ['What the scores mean', 'i-bulb', ['Pitch: on the notes \u00B7 Timing: on the beat', 'Clarity: words clear \u00B7 Energy: delivery', '\u26A0 a pop, clip or loud breath was heard']],
         export: ['Each file carries its role', 'i-bulb', ['Lead, Double, Ad-lib, Backing, Guitar', 'Voxology reads the role automatically', 'Plain WAV: opens in any DAW']],
       }[p];
       const checks = p === 'comp' || p === 'tighten';
       ob.appendChild(h('div', 'opt-title', `${icon(opts[1])}${opts[0]}`));
-      opts[2].forEach((t) => ob.appendChild(h('div', 'opt', checks ? `<span class="check on">✓</span>${t}` : `<span class="gold">•</span>${t}`)));
+      opts[2].forEach((t) => ob.appendChild(h('div', 'opt', checks ? `<span class="check on">\u2713</span>${t}` : `<span class="gold">\u2022</span>${t}`)));
     }
     sendButtons();
     const go = { lyrics: 'Line Up<br>Lyrics', comp: 'Build<br>Performance', tighten: 'Apply &amp;<br>Render', review: 'Re-score<br>All Takes', export: 'Render<br>All' }[p];
@@ -640,6 +687,7 @@
     else renderLyricBarText();
     movePlayheads();
     if (S.page === 'record' && now - lastRec > 60) { lastRec = now; renderRecordLive(); }
+    if (real() && S.page === 'record') T.drawRecord($('#rec-canvas'), $('#rec-bars'));
     if (!Bridge.inHost) { glowLevel = S.playing ? Math.max(0, D.vocalEnvelope(S.time, 222, 0)) : 0; setMeter(glowLevel); drawGlow(); }
     if (S.playing) raf = requestAnimationFrame(tick);
   }
@@ -654,7 +702,7 @@
     $('#p-now').innerHTML = l.words.map((w) => (S.time >= w.start ? `<span class="sung">${w.w}</span>` : w.w)).join(' ');
     $('#p-next').innerHTML = D.lines[cur + 1] ? D.lines[cur + 1].text : '';
     fitPrompter();
-    if (S.armed) drawRecWave();
+    if (S.armed && !real()) drawRecWave();
   }
   function setMeter(v) {
     const m = $('#rec-meter'); if (!m.children.length) for (let i = 0; i < 14; i++) m.appendChild(h('i', i >= 12 ? 'r' : i >= 9 ? 'y' : ''));
@@ -670,13 +718,22 @@
     sb.innerHTML = `
       <div class="set-row"><div>Look<small>Or click the logo</small></div><div class="seg" id="set-theme"><button data-v="dark">Dark</button><button data-v="light">Light</button></div></div>
       <div class="set-row"><div>Window size<small>Drag the corner in your DAW, or pick one</small></div><div class="seg" id="set-size"><button data-v="0.6">S</button><button data-v="0.8">M</button><button data-v="1">L</button></div></div>
+      <div class="set-row"><div>Takes folder<small class="path">${escapeHtml(TS.folder || (TS.takesRoot ? TS.takesRoot + ' (a folder per track is made at the first take)' : 'Documents / Comp Captain'))}</small></div><button class="pill" id="set-folder">Open</button></div>
+      <div class="set-row"><div>Loop Takes<small>Each time your DAW's loop comes round, a new take (off: only the first pass)</small></div><div class="seg" id="set-loop"><button data-v="1">On</button><button data-v="0">Off</button></div></div>
+      <div class="set-row"><div>ARA (Cubase Extension)<small>What your DAW shared with Comp Captain, to send back if something looks wrong</small></div><div class="btn-row"><button class="pill" id="set-report">Show</button><button class="pill" id="set-copy">Copy</button></div></div>
+      <pre class="report" id="set-report-text" hidden></pre>
       <div class="set-row"><div>Background listening<small>Uses at most half your computer's cores, never the audio thread</small></div><span class="gold">On</span></div>
       <div class="set-row"><div>Voxology<small>${st('voxology')}</small></div><span class="dot ${S.sonicology.voxology === 'linked' ? 'on' : ''}"></span></div>
       <div class="set-row"><div>Mixology<small>${st('mixology')}</small></div><span class="dot ${S.sonicology.mixology === 'linked' ? 'on' : ''}"></span></div>
       <p class="dim small" style="margin-top:14px">Comp Captain works fully on its own. It works even better with the Sonicology suite (Voxology, Mixology).</p>
-      <p class="dim small">Comp Captain ${S.version} · ${S.host}</p>`;
+      <p class="dim small">Comp Captain ${S.version} \u00B7 ${S.host}</p>`;
     $$('#set-theme button').forEach((b) => { b.classList.toggle('on', b.dataset.v === S.theme); b.onclick = () => { setTheme(b.dataset.v, true); renderSettings(); }; });
     $$('#set-size button').forEach((b) => { b.onclick = () => Bridge.inHost ? Bridge.send('size', { scale: parseFloat(b.dataset.v) }) : toast('In the plug-in this resizes the window.'); });
+    $('#set-folder').onclick = () => T.openFolder();
+    $$('#set-loop button').forEach((b) => { b.classList.toggle('on', (b.dataset.v === '1') === TS.capture.loopTakes); b.onclick = () => { T.setLoopTakes(b.dataset.v === '1'); setTimeout(renderSettings, 150); }; });
+    $('#set-report').onclick = () => T.askReport(false);
+    $('#set-copy').onclick = () => T.askReport(true);
+    if (TS.report) { $('#set-report-text').hidden = false; $('#set-report-text').textContent = TS.report; }
   }
 
   // ------------------------------------------------------------------ redraw all canvases (size or theme change)
@@ -705,7 +762,10 @@
     $('#t-solo').onclick = (e) => e.currentTarget.classList.toggle('on');
     bindSlider($('.topbar .vol'));
     bindSlider($('#picky'), (v) => toast(v < 0.5 ? 'Fewer cuts: sounds more like one performance' : 'Best every line: picks the top take for each line'));
-    $('#track-select').onclick = (e) => menu(e.currentTarget, ['Vocal – Lead', 'Vocal – Double L', 'Vocal – Double R', 'Vocal – Ad-Libs', 'BV – Stack', 'Guitar – Rhythm'], (it) => { $('#track-name').textContent = it; $('#track-name').dataset.custom = it; toast('Tracks link up in M1. This is a preview.'); });
+    $('#track-select').onclick = (e) => {
+      if (real()) return T.trackMenu(e.currentTarget);
+      menu(e.currentTarget, ['Vocal \u2013 Lead', 'Vocal \u2013 Double L', 'Vocal \u2013 Double R', 'Vocal \u2013 Ad-Libs', 'BV \u2013 Stack', 'Guitar \u2013 Rhythm'], (it) => { $('#track-name').textContent = it; $('#track-name').dataset.custom = it; toast('In the plug-in, every track with Comp Captain on it shows here.'); });
+    };
     $('#comp-style').onclick = (e) => menu(e.currentTarget, Object.keys(D.styles), setStyle);
     $$('#view-seg button').forEach((b) => { b.onclick = () => setCompView(b.dataset.view, true); });
     $('#auto-comp').onclick = () => setChoice(autoComp(), 'Auto Comp picked the best take for every line.');
@@ -718,14 +778,34 @@
     $('#redo').onclick = () => { if (!S.redo.length) return toast('Nothing to redo'); S.undo.push(S.choice); S.choice = S.redo.pop(); renderComp(); renderReview(); renderFooter(); };
     $('#go-btn').onclick = goAction;
     // record page
-    $('#r-arm').onclick = () => { S.armed = !S.armed; Bridge.send('arm', { on: S.armed }); toast(S.armed ? 'Armed. Press Record in your DAW to start the take.' : 'Disarmed'); renderRecord(); renderFooter(); };
+    $('#r-arm').onclick = () => {
+      if (real()) {
+        if (TS.ara || TS.capture.ara) return toast('This Comp Captain is a Cubase Extension: its takes come from the lanes. Use the one on the track\'s inserts to capture.', 5000);
+        if (TS.standalone) return toast('The standalone app has no DAW to record with. Put Comp Captain on a track in your DAW to capture takes, or add files with +.', 5000);
+        const on = !TS.capture.armed; T.setArmed(on);
+        toast(on ? 'Armed. Press Record in your DAW: every pass becomes a take. (The track must be monitoring.)' : 'Disarmed', 4000);
+        return;
+      }
+      S.armed = !S.armed; toast(S.armed ? 'Armed. Press Record in your DAW to start the take.' : 'Disarmed'); renderRecord(); renderFooter();
+    };
     $('#r-play').onclick = () => play(); $('#r-stop').onclick = stop;
     $('#r-start').onclick = () => { S.time = D.sections[S.recSection].start; renderRecord(); movePlayheads(); };
     $('#rec-sec-prev').onclick = () => { S.recSection = Math.max(0, S.recSection - 1); S.time = D.sections[S.recSection].start; renderRecord(); movePlayheads(); };
     $('#rec-sec-next').onclick = () => { S.recSection = Math.min(D.sections.length - 1, S.recSection + 1); S.time = D.sections[S.recSection].start; renderRecord(); movePlayheads(); };
     $('#rec-loop').onclick = () => { S.recLoop = !S.recLoop; renderRecord(); };
     $('#rec-click').onclick = () => { S.recClick = !S.recClick; renderRecord(); };
-    $('#take-prev').onclick = $('#take-next').onclick = () => toast('Takes are counted for you as you record.');
+    const stepTake = (d) => {
+      if (!real()) return toast('Takes are counted for you as you record.');
+      if (!TS.list.length) return;
+      const i = TS.list.findIndex((x) => x.id === TS.sel);
+      T.select(TS.list[Math.max(0, Math.min(TS.list.length - 1, (i < 0 ? TS.list.length : i) + d))].id);
+    };
+    $('#take-prev').onclick = () => stepTake(-1);
+    $('#take-next').onclick = () => stepTake(1);
+    $('#add-files').onclick = () => T.addFiles();
+    $('#open-folder').onclick = () => T.openFolder();
+    $('#sv-add').onclick = () => T.addFiles();
+    T.wireDrop(stage, $('#drop-hint'));
     // lyrics page
     $('#lyr-text').value = demoLyricsText();
     $('#lyr-text').addEventListener('input', renderLyricsList);
@@ -741,7 +821,7 @@
       f.text().then((t) => { $('#lyr-text').value = t; renderLyricsList(); toast(`Opened ${f.name}`); picker.value = ''; });
     };
     $('#lyr-hear').onclick = () => soon('Hear It (lyrics written from your takes)', 'M2');
-    $('#lyr-extras').onclick = (e) => menu(e.currentTarget, ['Song Rider Pro song…', 'Song Savant song…', 'Key Compass song…'], () => soon('Opening songs from your other apps', 'M2'));
+    $('#lyr-extras').onclick = (e) => menu(e.currentTarget, ['Song Rider Pro song\u2026', 'Song Savant song\u2026', 'Key Compass song\u2026'], () => soon('Opening songs from your other apps', 'M2'));
     // tighten
     $$('#layer-tabs button').forEach((b) => { b.onclick = () => { S.tab = b.dataset.tab; renderTighten(); }; });
     $$('#ba-seg button').forEach((b) => { b.onclick = () => { S.ba = b.dataset.ba; renderTighten(); }; });
@@ -774,6 +854,7 @@
   // ------------------------------------------------------------------ messages from the plug-in
   Bridge.on('init', (m) => {
     if (m.version) S.version = m.version;
+    stage.dataset.ara = m.ara ? '1' : '';
     if (m.host) S.host = m.host;
     if (m.sonicology) S.sonicology = Object.assign(S.sonicology, m.sonicology);
     if (m.theme) setTheme(m.theme, false);
@@ -789,8 +870,39 @@
     glowLevel = n; setMeter(n); drawGlow();
   });
 
+  // ------------------------------------------------------------------ real takes changed (takes.js)
+  let realQueued = false;
+  function realRedraw() {
+    if (realQueued) return; realQueued = true;
+    requestAnimationFrame(() => {
+      realQueued = false;
+      if (S.page === 'record') renderRecord();
+      if (S.page === 'comp') renderComp();
+      if (S.page === 'record') renderFooter();
+      $('#track-name').textContent = T.trackLabel();
+    });
+  }
+  T.setToast(toast);
+  T.setMenu(menu);
+  T.onChange((what) => {
+    if (!real()) return;
+    if (what === 'transport') {
+      // only the numbers and playheads move
+      if (S.page === 'record') {
+        const t = TS.transport;
+        $('#rec-bpm').textContent = t.known ? String(Math.round(t.bpm * 100) / 100) : '\u2013';
+        $('#rec-sig').textContent = t.known ? `${t.num}/${t.den}` : '\u2013/\u2013';
+        T.drawRecord($('#rec-canvas'), $('#rec-bars'));
+      } else if (S.page === 'comp' && S.compView === 'song') T.drawLanes($('#lanes'), $('#lane-lyrics'));
+      return;
+    }
+    if (what === 'report') { if (!$('#settings').hidden) renderSettings(); return; }
+    realRedraw();
+  });
+
   // ------------------------------------------------------------------ start
   wire();
+  T.mockStart();
   setTheme(S.theme, false);
   setPage(S.page, false);
   setCompView(S.compView, false);

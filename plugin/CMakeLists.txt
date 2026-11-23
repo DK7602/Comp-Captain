@@ -19,6 +19,7 @@ juce_add_plugin(CompCaptain
     EDITOR_WANTS_KEYBOARD_FOCUS TRUE
     COPY_PLUGIN_AFTER_BUILD FALSE
     VST3_CATEGORIES Fx Tools
+    IS_ARA_EFFECT TRUE
     AU_MAIN_TYPE kAudioUnitType_Effect
     NEEDS_WEB_BROWSER TRUE
     NEEDS_WEBVIEW2 TRUE
@@ -37,6 +38,8 @@ add_custom_command(OUTPUT "${CC_UI_ZIP}"
 juce_add_binary_data(CompCaptainUiData SOURCES "${CC_UI_ZIP}")
 
 target_sources(CompCaptain PRIVATE
+    AraSupport.cpp
+    AudioImport.cpp
     PluginProcessor.cpp
     PluginEditor.cpp
     UiResources.cpp)
@@ -46,12 +49,16 @@ target_compile_definitions(CompCaptain PUBLIC
     JUCE_USE_CURL=0
     JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
     JUCE_VST3_CAN_REPLACE_VST2=0
+    JUCE_USE_MP3AUDIOFORMAT=1
+    JUCE_USE_OGGVORBIS=0
+    JUCE_USE_WINDOWS_MEDIA_FORMAT=0
     JUCE_STRICT_REFCOUNTEDPOINTER=1)
 
 target_link_libraries(CompCaptain
     PRIVATE
         CompCaptainUiData
         cc_engine
+        juce::juce_audio_formats
         juce::juce_audio_utils
         juce::juce_gui_extra
     PUBLIC

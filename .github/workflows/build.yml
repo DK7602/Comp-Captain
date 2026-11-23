@@ -58,6 +58,25 @@ jobs:
             "$HOST" "$VST3"
           fi
 
+      - name: ARA test (a pretend DAW uses it as an Extension)
+        shell: bash
+        run: |
+          VST3="build/plugin/CompCaptain_artefacts/Release/VST3/Comp Captain.vst3"
+          ARA=build/host-test/CompCaptainAraTest_artefacts/Release/CompCaptainAraTest
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            xvfb-run -a bash -c 'fluxbox >/dev/null 2>&1 & sleep 2; "$0" "$1"' "$ARA" "$VST3"
+          else
+            "$ARA" "$VST3"
+          fi
+
+      - name: Interface test (the window's messages, in a real browser)
+        if: runner.os == 'Linux'
+        working-directory: tests/ui
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          node bridge-test.js
+
       - name: Gather the files to install
         shell: bash
         run: |

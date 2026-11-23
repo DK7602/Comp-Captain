@@ -2,6 +2,8 @@
 // loaded from the internet (the interface is packed inside the plug-in).
 #include <catch2/catch_test_macros.hpp>
 
+#include "cc/UiFiles.h"
+
 #include <filesystem>
 #include <fstream>
 #include <regex>
@@ -81,4 +83,48 @@ TEST_CASE ("The six pages are all in the interface, and Mix Assist is gone")
         CHECK (html.find (std::string ("class=\"page\" data-page=\"") + page + "\"") != std::string::npos);
     }
     CHECK (html.find ("Mix Assist") == std::string::npos);
+}
+
+TEST_CASE ("Interface text files are served as UTF-8, so every web view shows - and the checkmarks right")
+{
+    CHECK (cc::mimeTypeFor ("index.html") == "text/html; charset=utf-8");
+    CHECK (cc::mimeTypeFor ("js/app.js") == "text/javascript; charset=utf-8");
+    CHECK (cc::mimeTypeFor ("css/app.css") == "text/css; charset=utf-8");
+    CHECK (cc::mimeTypeFor ("img/LOGO.PNG") == "image/png");
+    CHECK (cc::mimeTypeFor ("fonts/SourceSans3-Upright.woff2") == "font/woff2");
+    CHECK (cc::mimeTypeFor ("README") == "application/octet-stream");
+}
+
+TEST_CASE ("Every file the interface uses has a known type")
+{
+    for (const auto& entry : fs::recursive_directory_iterator (uiDir))
+    {
+        if (! entry.is_regular_file())
+            continue;
+        INFO (entry.path().string());
+        CHECK (cc::mimeTypeFor (entry.path().filename().string()) != "application/octet-stream");
+    }
+}
+
+TEST_CASE ("Interface files are plain ASCII (special characters are written as escapes)")
+{
+    // Some web views (Linux's, and maybe the Mac's) read the packed files as Latin-1 no matter what they
+    // say, which turns "-", "." and checkmarks into junk. So "\u2013" in scripts, "&#x2013;" in HTML.
+    for (const auto& entry : fs::recursive_directory_iterator (uiDir))
+    {
+        const auto ext = entry.path().extension().string();
+        if (ext != ".html" && ext != ".css" && ext != ".js")
+            continue;
+        const auto text = readFile (entry.path());
+        size_t line = 1, bad = 0;
+        for (unsigned char c : text)
+        {
+            if (c == '\n')
+                ++line;
+            if (c > 127 && bad == 0)
+                bad = line;
+        }
+        INFO (entry.path().string() << ": first special character on line " << bad);
+        CHECK (bad == 0);
+    }
 }

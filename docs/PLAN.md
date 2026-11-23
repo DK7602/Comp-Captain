@@ -184,6 +184,35 @@ loads clean; their fixes (sharper waveforms, bigger lyrics, Assistant badge back
 ### M1 - Takes in
 CAPTURE, file drop and the ARA proof. Take list, roles, waveforms placed on the song's bars.
 Pass: record 5 takes in Cubase, they all show at the right bar; ARA sees the lane takes (or we learn its limits).
+**Status (2026-11-23):** built, version 0.2.0, waiting for the owner's Cubase test. What's in it:
+- **CAPTURE** (engine `Capture`): armed by the red button (a non-automatable "CAPTURE armed" parameter, never armed
+  when a project opens). While armed and the DAW records, the audio thread copies the track's sound into a lock-free
+  ring; a shared background thread writes 32-bit float WAVs (header kept current, so a crash keeps the take) to
+  `Documents/Comp Captain/<date> <track> (<id>)/Take N.wav`. A jump in the song position (the DAW's cycle) starts a
+  new take ("Loop Takes"; off = keep only the first pass). Silent passes (track not monitoring) and passes under
+  half a second aren't kept, with a plain message. If the disk falls behind, the gap is filled with silence so the
+  take stays in time.
+- **Where a take sits**: quarter notes from the DAW (`ppq`), the DAW's bar start, tempo and time signature.
+  Bars are counted in the current time signature (exact with ARA, which reads the song's real bar map).
+  Not compensated yet: the audio interface's round-trip delay (VST3 doesn't tell plug-ins); every captured take is
+  late by the same few milliseconds, so takes still line up with each other. Revisit for Timing scores (M3).
+- **Files**: WAV / AIFF / FLAC / MP3 by drag and drop (the web view only gets the bytes, which are sent over in
+  pieces) or the + button (native file chooser); placed at a bar and tempo; copied into the takes folder as WAV.
+- **Take list**: names, roles (guessed from the track or file name, always changeable), hearts, rename, remove
+  (the file moves to "Removed takes"), all saved with the project. The track picker lists every Comp Captain in the
+  project (same process); the track's role is set there.
+- **ARA**: Comp Captain is an ARA 2 Extension. It lists every playback region the DAW shares (on its bar, from the
+  song's tempo and bar map), plays the regions assigned to it unchanged (sample-exact in the tests), reads the audio
+  for waveforms, keeps roles and hearts in the DAW's ARA archive, and writes a plain report (Settings > ARA > Copy)
+  of what the DAW sent: that's the proof to collect from Cubase Artist.
+- **Interface**: the Record page and the Comp page's Song view show the real takes; pages that need lyrics or scores
+  show the sample song with a gold SAMPLE tag. Interface files are plain ASCII (special characters as escapes)
+  because Linux's web view read them as Latin-1 (and the Mac's might).
+- **Tests**: engine (Catch2), CAPTURE through a real VST3 load with a pretend transport (host test), adding files
+  (WAV / AIFF / FLAC made on the fly; the owner's MP3 vocals locally), ARA with a pretend DAW (renders exactly, follows
+  a moved take, saves, closes cleanly), and the window's messages in a real browser (Playwright).
+- Not in M1 (by plan): hearing a take on its own (M4), the teleprompter following real lyrics (M2), guessing roles
+  from how a take lines up with the others (needs M2/M3 analysis).
 
 ### M2 - Lines and lyrics
 Lyrics in (paste / song files), auto line-up with the audio, phrases without lyrics, the teleprompter.
@@ -210,5 +239,8 @@ Role tags for Voxology and Mixology, Word swap, the video tutorial, the DAW guid
 - Optional: a cleaner, larger "Your Comping Captain" script as a transparent PNG (for now it's cut from a mockup).
 - **Test sessions**: a few real vocal sessions, ideally 5+ takes of the same verse, a double or two and some ad-libs,
   across genres (a rap verse, a sung hook, a country or rock part, doubled guitars if possible). They're for testing
-  only and never go in the repo.
+  only and never go in the repo. Already reachable: the owner's single-take vocals in the Voxology repository
+  (`test-audio/`, e.g. Don_Birthday_2024_Vox_only.mp3, the Gallas / Schaf / Don & Lysette acapellas), fine for M1/M2;
+  M3 still needs several takes of the same part.
+- **From the M1 Cubase test**: the ARA report (Settings > ARA > Copy) with takes on lanes selected.
 - Confirm the Styles list and the default score weights for each.

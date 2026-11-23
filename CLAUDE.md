@@ -4,19 +4,24 @@ Comp Captain is a planned JUCE 8 plug-in and standalone app (VST3, Standalone, A
 line of every vocal take, builds the best comp from them, and tightens doubles, stacks, ad-libs, backing vocals and
 doubled guitars to the lead. **The plan is `docs/PLAN.md`: read it first.**
 
-## Status (2026-11-23): M0 done, M1 next
+## Status (2026-11-23): M1 built (0.2.0), waiting for the owner's Cubase test
 
-- **M0 (the look) is built: version 0.1.1.** The owner tested it in Cubase: it loads clean. CI is green on Windows, macOS and
-  Linux (20 engine tests + the host test). Their fixes went into 0.1.1: sharper waveforms, bigger lyric text, and a
-  navy backing for the Assistant badge (it looked like it had missing pieces in the light look).
+- **M0 (the look)** done, 0.1.1, tested in Cubase by the owner (loads clean; sharper waveforms, bigger lyric text,
+  navy Assistant badge backing).
+- **M1 (takes in)** built, version 0.2.0: CAPTURE, file drop, take list with roles and hearts, takes on the song's
+  bars, track picker across copies, ARA Extension with a copyable report. Details in `docs/PLAN.md` (M1 status).
+  Next: the owner's Cubase test (INSTALL.txt "Try M1 in Cubase"), then M2 (lyrics). Ask before starting M2.
 - The owner cares most about **big lyrics on the Record page** (the teleprompter).
 - Decisions are in `docs/PLAN.md`, "Decisions after the art". Interface: **web view** (`ui/`), packed into the
   plug-in. Keep the title, logo, glows and backgrounds exactly as the owner's art (`art/`); layout is ours.
-- **Next: M1 (Takes in)**: CAPTURE, file drop, the ARA proof, take list, roles, waveforms on the song's bars.
-  Ask the owner before starting it.
-- **Test vocals:** the owner has dry vocals (theirs and other singers') from earlier plug-in chats, but those
-  files are not reachable from new chats. They'll attach WAVs or share a Drive link from their computer. Needed
-  from M2/M3 on; never commit them to the repo.
+- Takes are saved in `Documents/Comp Captain/<date> <track> (<id>)/` (owner's choice). `COMP_CAPTAIN_TAKES_FOLDER`
+  overrides it (tests).
+- **Interface files must stay plain ASCII** (write `\u2013` in JS, `&#x2013;` in HTML, `\2013` in CSS): Linux's
+  web view reads them as Latin-1. A test enforces it.
+- **Test vocals:** the owner's dry vocals are in the public Voxology repo, `test-audio/` (MP3, single takes: e.g.
+  Don_Birthday_2024_Vox_only, Gallas / Schaf / Don & Lysette acapellas; see its README). Clone it into the
+  scratchpad and point `CC_TEST_AUDIO` at them. For M3 we still need 5+ takes of the same part from the owner.
+  Never commit vocals to this repo.
 - Work milestone by milestone; each ends with a test in Cubase by the owner.
 
 ## About the owner
@@ -32,7 +37,8 @@ doubled guitars to the lead. **The plan is `docs/PLAN.md`: read it first.**
 ## Habits to keep (from the other plug-ins)
 
 - Framework-free C++20 engine with Catch2 tests; the JUCE wrapper stays thin.
-- CI on every push (Windows, macOS, Linux), tests must pass, plus a host test that loads the VST3 like a DAW.
+- CI on every push (Windows, macOS, Linux), tests must pass, plus a host test that loads the VST3 like a DAW, an
+  ARA test with a pretend DAW, and (Linux) the interface message test in a real browser.
 - Only licences that allow selling later (MIT / Apache / BSD / BSL; no GPL). Every third-party piece goes in
   THIRD_PARTY_NOTICES.txt.
 - An in-app manual in plain words, updated whenever behaviour changes. Version in `CMakeLists.txt`.

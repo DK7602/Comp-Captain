@@ -29,12 +29,12 @@
 
   <!-- ===================== LEFT: PAGES ===================== -->
   <nav id="nav" class="panel">
-    <button class="nav-btn" data-go="record"><svg viewBox="0 0 24 24"><use href="#i-mic"/></svg><b>Record</b><small>Capture · Teleprompter</small></button>
-    <button class="nav-btn" data-go="lyrics"><svg viewBox="0 0 24 24"><use href="#i-lyrics"/></svg><b>Lyrics</b><small>Paste · Open · Hear It</small></button>
+    <button class="nav-btn" data-go="record"><svg viewBox="0 0 24 24"><use href="#i-mic"/></svg><b>Record</b><small>Capture &#xB7; Teleprompter</small></button>
+    <button class="nav-btn" data-go="lyrics"><svg viewBox="0 0 24 24"><use href="#i-lyrics"/></svg><b>Lyrics</b><small>Paste &#xB7; Open &#xB7; Hear It</small></button>
     <button class="nav-btn" data-go="comp"><svg viewBox="0 0 24 24"><use href="#i-crown"/></svg><b>Comp</b><small>Build Best Take</small></button>
-    <button class="nav-btn" data-go="tighten"><svg viewBox="0 0 24 24"><use href="#i-target"/></svg><b>Tighten</b><small>Doubles · Ad-Libs · BV</small></button>
-    <button class="nav-btn" data-go="review"><svg viewBox="0 0 24 24"><use href="#i-bars"/></svg><b>Review</b><small>Scores · Style · Check</small></button>
-    <button class="nav-btn" data-go="export"><svg viewBox="0 0 24 24"><use href="#i-export"/></svg><b>Export</b><small>Render · Drag to DAW</small></button>
+    <button class="nav-btn" data-go="tighten"><svg viewBox="0 0 24 24"><use href="#i-target"/></svg><b>Tighten</b><small>Doubles &#xB7; Ad-Libs &#xB7; BV</small></button>
+    <button class="nav-btn" data-go="review"><svg viewBox="0 0 24 24"><use href="#i-bars"/></svg><b>Review</b><small>Scores &#xB7; Style &#xB7; Check</small></button>
+    <button class="nav-btn" data-go="export"><svg viewBox="0 0 24 24"><use href="#i-export"/></svg><b>Export</b><small>Render &#xB7; Drag to DAW</small></button>
     <svg class="compass" viewBox="0 0 200 200" aria-hidden="true"><use href="#compass"/></svg>
   </nav>
 
@@ -45,7 +45,7 @@
     <div class="topbar">
       <div class="select track-select" id="track-select">
         <svg viewBox="0 0 24 24"><use href="#i-folder"/></svg>
-        <span id="track-name">Vocal – Lead (Verse 1)</span>
+        <span id="track-name">Vocal &#x2013; Lead (Verse 1)</span>
         <svg class="chev" viewBox="0 0 24 24"><use href="#i-chev-down"/></svg>
       </div>
       <div class="btn-group">
@@ -63,6 +63,7 @@
 
     <!-- Current lyric line + sections strip (all pages except Record) -->
     <div class="lyricbar">
+      <div class="sample-badge">Sample song &#xB7; your lyrics and sections arrive in M2</div>
       <div class="lyric-line">
         <button class="arrow" id="line-prev" title="Previous line"><svg viewBox="0 0 24 24"><use href="#i-chev-left"/></svg></button>
         <div class="line-text" id="line-text"></div>
@@ -70,9 +71,9 @@
       </div>
       <div class="chips" id="section-chips"></div>
       <div class="overview">
-        <button class="mini-arrow" id="ov-left">◀</button>
+        <button class="mini-arrow" id="ov-left">&#x25C0;</button>
         <canvas id="overview" width="900" height="36"></canvas>
-        <button class="mini-arrow" id="ov-right">▶</button>
+        <button class="mini-arrow" id="ov-right">&#x25B6;</button>
         <div class="ov-playhead" id="ov-playhead"></div>
       </div>
       <div class="ruler" id="ruler"></div>
@@ -82,7 +83,7 @@
     <section class="page" data-page="record">
       <div class="rec-title"><span class="wave-l"></span><svg viewBox="0 0 24 24"><use href="#i-mic"/></svg><span>LYRIC RECORDING MODE</span><span class="wave-r"></span></div>
       <div class="rec-info">
-        <div class="pill-select gold-outline"><button id="rec-sec-prev">‹</button><span id="rec-section">Verse 1</span><button id="rec-sec-next">›</button></div>
+        <div class="pill-select gold-outline"><button id="rec-sec-prev">&#x2039;</button><span id="rec-section">Verse 1</span><button id="rec-sec-next">&#x203A;</button></div>
         <span class="sep"></span><span>BPM <b id="rec-bpm">92</b></span>
         <span class="sep"></span><span>Key <b id="rec-key">E minor</b></span>
         <span class="sep"></span><span id="rec-sig">4/4</span>
@@ -91,6 +92,7 @@
         <button class="pill gold-outline on" id="rec-loop"><svg viewBox="0 0 24 24"><use href="#i-loop"/></svg>Loop</button>
       </div>
       <div class="prompter" id="prompter">
+        <div class="sample-badge" title="The teleprompter shows your own lyrics from M2 (Lyrics). Your takes are real.">Sample lyrics &#xB7; yours arrive in M2</div>
         <div class="p-line prev" id="p-prev"></div>
         <div class="p-line now" id="p-now"></div>
         <div class="p-line next" id="p-next"></div>
@@ -102,7 +104,7 @@
         <div class="p-head small"></div>
       </div>
       <div class="rec-controls">
-        <div class="pill-select gold-outline big"><button id="take-prev">‹</button><span id="rec-take">Take 6 of 8</span><button id="take-next">›</button></div>
+        <div class="pill-select gold-outline big"><button id="take-prev">&#x2039;</button><span id="rec-take">Take 6 of 8</span><button id="take-next">&#x203A;</button></div>
         <div class="transport">
           <button class="round" id="r-start" title="Back to the start of the section"><svg viewBox="0 0 24 24"><use href="#i-start"/></svg></button>
           <button class="round rec" id="r-arm" title="Arm CAPTURE. Recording starts when you press Record in your DAW."><i></i></button>
@@ -115,15 +117,16 @@
 
     <!-- ===== PAGE: LYRICS ===== -->
     <section class="page" data-page="lyrics">
+      <div class="sample-badge">Sample lyrics &#xB7; lining up your own arrives in M2</div>
       <div class="lyr-tools">
         <button class="tool-btn" id="lyr-paste"><svg viewBox="0 0 24 24"><use href="#i-paste"/></svg><b>Paste</b><small>From anywhere</small></button>
-        <button class="tool-btn" id="lyr-open"><svg viewBox="0 0 24 24"><use href="#i-folder"/></svg><b>Open File</b><small>.txt · .docx · .lrc</small></button>
+        <button class="tool-btn" id="lyr-open"><svg viewBox="0 0 24 24"><use href="#i-folder"/></svg><b>Open File</b><small>.txt &#xB7; .docx &#xB7; .lrc</small></button>
         <button class="tool-btn" id="lyr-hear"><svg viewBox="0 0 24 24"><use href="#i-ear"/></svg><b>Hear It</b><small>Written from your takes</small></button>
-        <button class="tool-btn extras" id="lyr-extras"><svg viewBox="0 0 24 24"><use href="#i-song"/></svg><b>From My Songs</b><small>Song Rider Pro · Song Savant · Key Compass</small></button>
+        <button class="tool-btn extras" id="lyr-extras"><svg viewBox="0 0 24 24"><use href="#i-song"/></svg><b>From My Songs</b><small>Song Rider Pro &#xB7; Song Savant &#xB7; Key Compass</small></button>
       </div>
       <div class="lyr-body">
         <div class="lyr-editor">
-          <div class="box-head"><svg viewBox="0 0 24 24"><use href="#i-lyrics"/></svg>Lyrics <span class="dim">— type <b>[Verse 1]</b>, <b>[Chorus]</b>… above a part to make sections</span></div>
+          <div class="box-head"><svg viewBox="0 0 24 24"><use href="#i-lyrics"/></svg>Lyrics <span class="dim">&#x2014; type <b>[Verse 1]</b>, <b>[Chorus]</b>&#x2026; above a part to make sections</span></div>
           <textarea id="lyr-text" spellcheck="false"></textarea>
         </div>
         <div class="lyr-lines">
@@ -137,8 +140,9 @@
     <section class="page" data-page="comp">
       <!-- Line view -->
       <div class="takes-box view-line">
+        <div class="sample-badge" title="Real scores arrive in M3. Your own takes are in the Song view.">Sample scores &#xB7; real ones in M3</div>
         <div class="takes-head">
-          <svg class="chev" viewBox="0 0 24 24"><use href="#i-chev-down"/></svg><b>Takes – Current Line</b>
+          <svg class="chev" viewBox="0 0 24 24"><use href="#i-chev-down"/></svg><b>Takes &#x2013; Current Line</b>
           <div class="line-info"><span id="li-count">Line 3 of 12 | Verse 1</span><i id="li-text"></i></div>
           <div class="cols"><span><svg viewBox="0 0 24 24"><use href="#i-fork"/></svg>Pitch</span><span><svg viewBox="0 0 24 24"><use href="#i-clock"/></svg>Timing</span><span><svg viewBox="0 0 24 24"><use href="#i-gem"/></svg>Clarity</span><span><svg viewBox="0 0 24 24"><use href="#i-bolt"/></svg>Energy</span><span class="tot"><svg viewBox="0 0 24 24"><use href="#i-star"/></svg>Total</span></div>
         </div>
@@ -148,6 +152,7 @@
       <div class="lanes-box view-song">
         <div class="lanes-head">
           <button class="pill" id="sv-sections"><svg viewBox="0 0 24 24"><use href="#i-lyrics"/></svg>Lyrics / Sections</button>
+          <button class="sq small-sq sv-add" id="sv-add" title="Add takes from files (or drop them on the window)">+</button>
           <div class="lane-lyrics" id="lane-lyrics"></div>
         </div>
         <div class="lanes" id="lanes"></div>
@@ -172,6 +177,7 @@
 
     <!-- ===== PAGE: TIGHTEN ===== -->
     <section class="page" data-page="tighten">
+      <div class="sample-badge">Sample layers &#xB7; tightening arrives in M5</div>
       <div class="tight-box">
         <div class="takes-head"><svg class="chev" viewBox="0 0 24 24"><use href="#i-chev-down"/></svg><b>Layers lined up to the Lead</b>
           <div class="seg small" id="ba-seg"><button data-ba="before">Before</button><button data-ba="after">After</button></div></div>
@@ -181,8 +187,9 @@
 
     <!-- ===== PAGE: REVIEW ===== -->
     <section class="page" data-page="review">
+      <div class="sample-badge">Sample scores &#xB7; real scores arrive in M3</div>
       <div class="review-box">
-        <div class="takes-head"><svg class="chev" viewBox="0 0 24 24"><use href="#i-chev-down"/></svg><b>Every Line – Best Comp</b>
+        <div class="takes-head"><svg class="chev" viewBox="0 0 24 24"><use href="#i-chev-down"/></svg><b>Every Line &#x2013; Best Comp</b>
           <div class="cols"><span>Take</span><span>Pitch</span><span>Timing</span><span>Clarity</span><span>Energy</span><span class="tot">Total</span></div></div>
         <div class="review-rows" id="review-rows"></div>
       </div>
@@ -190,6 +197,7 @@
 
     <!-- ===== PAGE: EXPORT ===== -->
     <section class="page" data-page="export">
+      <div class="sample-badge">Sample files &#xB7; export arrives in M4</div>
       <div class="export-box">
         <div class="takes-head"><svg class="chev" viewBox="0 0 24 24"><use href="#i-chev-down"/></svg><b>Files to make</b><span class="dim">bar-aligned, named by role, ready for any DAW</span></div>
         <div class="export-rows" id="export-rows"></div>
@@ -207,7 +215,8 @@
     <!-- Record: Takes + Sections -->
     <div class="side-page" data-page="record">
       <div class="side-box">
-        <div class="side-title"><svg viewBox="0 0 24 24"><use href="#i-layers"/></svg>TAKES <span class="gold" id="takes-count">(8)</span></div>
+        <div class="side-title"><svg viewBox="0 0 24 24"><use href="#i-layers"/></svg>TAKES <span class="gold" id="takes-count">(8)</span>
+          <span class="title-tools"><button class="sq small-sq" id="add-files" title="Add takes from files (WAV, AIFF, FLAC, MP3). You can also drop files anywhere on this window.">+</button><button class="sq small-sq" id="open-folder" title="Open the folder your takes are saved in"><svg viewBox="0 0 24 24"><use href="#i-folder"/></svg></button></span></div>
         <div class="take-list" id="take-list"></div>
       </div>
       <div class="side-box">
@@ -220,7 +229,7 @@
       <div class="side-box">
         <div class="side-title"><svg viewBox="0 0 24 24"><use href="#i-lyrics"/></svg>Lyrics Status</div>
         <div class="status-list">
-          <div><i class="ok"></i>12 lines · 4 sections</div>
+          <div><i class="ok"></i>12 lines &#xB7; 4 sections</div>
           <div><i class="ok"></i>Lined up on 5 takes</div>
           <div><i class="warn"></i>Line 7: check the end (drag it)</div>
         </div>
@@ -288,7 +297,7 @@
     <img class="assistant for-dark" src="img/assistant.png" alt="Comp Captain Assistant" draggable="false">
     <img class="assistant for-light" src="img/assistant-light.png" alt="Comp Captain Assistant" draggable="false">
     <div class="msg-box" id="msg-box">
-      <div class="msg-top"><span class="check">✓</span><b id="msg-title"></b></div>
+      <div class="msg-top"><span class="check">&#x2713;</span><b id="msg-title"></b></div>
       <div class="msg-ticks" id="msg-ticks"></div>
     </div>
     <div class="opt-box" id="opt-box"></div>
@@ -299,16 +308,20 @@
   <!-- ===================== OVERLAYS ===================== -->
   <div class="overlay" id="manual" hidden>
     <div class="sheet panel">
-      <div class="sheet-head"><b>Comp Captain Manual</b><button class="icon-btn" data-close>✕</button></div>
+      <div class="sheet-head"><b>Comp Captain Manual</b><button class="icon-btn" data-close>&#x2715;</button></div>
       <div class="sheet-body" id="manual-body"></div>
     </div>
   </div>
   <div class="overlay" id="settings" hidden>
     <div class="sheet panel small">
-      <div class="sheet-head"><b>Settings</b><button class="icon-btn" data-close>✕</button></div>
+      <div class="sheet-head"><b>Settings</b><button class="icon-btn" data-close>&#x2715;</button></div>
       <div class="sheet-body" id="settings-body"></div>
     </div>
   </div>
+  <div class="overlay" id="dialog" hidden>
+    <div class="sheet panel dialog" id="dialog-body"></div>
+  </div>
+  <div class="drop-hint" id="drop-hint" hidden><div><svg viewBox="0 0 24 24"><use href="#i-drag"/></svg><b>Drop to add takes</b><small>WAV, AIFF, FLAC or MP3 &#xB7; you'll pick the bar next</small></div></div>
   <div class="toast" id="toast" hidden></div>
 </div>
 
@@ -384,6 +397,7 @@
 <script src="js/bridge.js"></script>
 <script src="js/demo.js"></script>
 <script src="js/wave.js"></script>
+<script src="js/takes.js"></script>
 <script src="js/manual.js"></script>
 <script src="js/app.js"></script>
 </body>
