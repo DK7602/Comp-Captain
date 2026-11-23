@@ -186,6 +186,13 @@ const { chromium } = require('playwright');
     lines: [line('I was lost in the dark', 0, -1, -1, { takes: 0 }), line('but You found me', 0, -1, -1, { takes: 0 }), line('I\'m alive, I\'m alive', 1, -1, -1, { takes: 0 })] });
   await p.waitForTimeout(120);
   check((await p.textContent('#p-prev')).includes('didn\u2019t seem to sing these lyrics'), 'and says so when the take didn\'t sing these lyrics');
+  await send({ type: 'lyrics', text: lyricsText, linedUp: 0, sungTakes: 1, heardTakes: 1, unmatched: [{ take: 'Take 1 (Verse Vox)', words: 4, heard: 'Happy birthday to you' }],
+    sections: [{ name: 'Verse 1', first: 0, count: 2 }, { name: 'Chorus', first: 2, count: 1 }],
+    lines: [line('I was lost in the dark', 0, -1, -1, { takes: 0 }), line('but You found me', 0, -1, -1, { takes: 0 }), line('I\'m alive, I\'m alive', 1, -1, -1, { takes: 0 })] });
+  await p.click('.nav-btn[data-go="lyrics"]');
+  await p.waitForTimeout(100);
+  check((await p.textContent('#lyr-status')).includes('Take 1 (Verse Vox) heard: \u201CHappy birthday to you\u201D'), 'Lyrics Status shows what an unmatched take heard');
+  await p.click('.nav-btn[data-go="record"]');
   await p.click('#btn-settings');
   await p.click('#set-lcopy');
   out = await sent();

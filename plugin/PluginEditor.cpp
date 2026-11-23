@@ -651,6 +651,16 @@ void CompCaptainEditor::sendLyrics (bool force)
     msg->setProperty ("linedUp", song->lineUp.takesLinedUp);
     msg->setProperty ("sungTakes", song->sungTakes);
     msg->setProperty ("heardTakes", song->heardTakes);
+    juce::Array<juce::var> unmatched;
+    for (auto& u : song->unmatched)
+    {
+        auto* o = new juce::DynamicObject();
+        o->setProperty ("take", u.take);
+        o->setProperty ("words", u.words);
+        o->setProperty ("heard", u.heard);
+        unmatched.add (juce::var (o));
+    }
+    msg->setProperty ("unmatched", unmatched);
     send ("lyrics", msg);
 }
 

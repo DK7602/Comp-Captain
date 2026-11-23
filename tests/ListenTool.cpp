@@ -2,6 +2,7 @@
 // word, with times) and, given the lyrics, where each line lands. A tool for trying it on real takes;
 // not part of the plug-in.
 #include "cc/LineUp.h"
+#include "cc/Resample.h"
 #include "cc/Speech.h"
 #include "cc/TextFile.h"
 #include "cc/WavFile.h"
@@ -30,7 +31,21 @@ int main (int argc, char** argv)
     cc::SpeechRecognizer::Options o;
     o.threads = (int) std::max (1u, std::thread::hardware_concurrency() / 2);
     const auto t0 = std::chrono::steady_clock::now();
-    const auto heard = cc::hearTake (sr, cc::pathFromUtf8 (argv[2]), o, error);
+    auto heard = cc::hearTake (sr, cc::pathFromUtf8 (argv[2]), o, error);
+    // --whole: listen to the whole take in one go (how 0.3.0 / 0.3.1 did it), for comparing
+    if (heard && argc > 4 && std::string (argv[4]) == "--whole")
+    {
+        if (const auto wav = cc::readWavFile (cc::pathFromUtf8 (argv[2])))
+        {
+            const auto audio = cc::resample (cc::toMono (wav->channels), wav->info.sampleRate, cc::SpeechRecognizer::sampleRate);
+            if (auto words = sr.listen (audio.data(), audio.size(), o))
+            {
+                std::printf ("(whole take: %zu words heard, %zu kept inside phrases)\n", words->size(),
+                             cc::keepWordsInPhrases (*words, heard->phrases).size());
+                heard->words = cc::keepWordsInPhrases (*words, heard->phrases);
+            }
+        }
+    }
     const auto secs = std::chrono::duration<double> (std::chrono::steady_clock::now() - t0).count();
     if (! heard)
     {

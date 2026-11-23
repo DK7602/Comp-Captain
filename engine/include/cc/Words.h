@@ -38,8 +38,9 @@ namespace cc
         bool operator== (const Hearing&) const = default;
     };
 
-    // 2: only the sung parts are listened to (0.3.2). Takes heard an older way are listened to again.
-    inline constexpr int hearingVersion = 2;
+    // 2: only the sung parts are listened to (0.3.2). 3: a take with sound but no phrases found is listened to
+    // whole (0.3.3). Takes heard an older way are listened to again.
+    inline constexpr int hearingVersion = 3;
 
     // Saved next to the take ("Take 3.wav" -> "Take 3.words") as plain text, one word or phrase per line.
     std::string hearingToText (const Hearing&);

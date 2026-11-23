@@ -233,15 +233,20 @@ namespace cc
         if (mono.empty())
             return h;
         h.phrases = findPhrases (mono.data(), mono.size(), info.sampleRate);
-        if (h.phrases.empty())
-            return h; // nothing sung
+        float peak = 0.0f;
+        for (float v : mono)
+            peak = std::max (peak, std::abs (v));
+        if (peak < 1.0e-4f)
+            return h; // silence: nothing sung
 
         auto audio = resample (mono, info.sampleRate, SpeechRecognizer::sampleRate);
         std::vector<float>().swap (mono);
 
         // Only the sung parts are listened to, joined end to end with a short pause between them: long
         // silences (the bars before you come in, a break) throw the recognizer's word times off badly.
-        const auto parts = sungParts (h.phrases, (double) audio.size() / SpeechRecognizer::sampleRate);
+        // (no phrases found in a take that has sound: the whole take is listened to)
+        const double takeLength = (double) audio.size() / SpeechRecognizer::sampleRate;
+        const auto parts = h.phrases.empty() ? std::vector<SungPart> { { 0.0, takeLength, 0.0 } } : sungParts (h.phrases, takeLength);
         std::vector<float> joined;
         for (auto& p : parts)
         {

@@ -163,6 +163,13 @@ public:
         std::map<std::uint64_t, juce::String> takeNames; // "Take 3 (Lead Vox)"
         int sungTakes = 0;                               // vocal takes in the song
         int heardTakes = 0;                              // ...that have been listened to
+        struct Unmatched
+        {
+            juce::String take;                           // "Take 1 (Verse Vox)"
+            int words = 0;
+            juce::String heard;                          // its first words, as heard
+        };
+        std::vector<Unmatched> unmatched;                // takes listened to that didn't sing these lyrics
     };
     // The lyrics and where each line sits (message thread). Worked out again only when something changed.
     static std::shared_ptr<const Song> song();

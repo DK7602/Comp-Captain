@@ -277,6 +277,10 @@ Pass: on the owner's real takes, lines land within a word of where they belong.
   phrase they begin in (within 1.5 s; whisper was often ~1 s early) and end on a phrase end (`settleOnPhrases`). The
   phrase finder ignores digital silence when judging the quiet level, so silence before the singing doesn't hide the
   breaths. Same take with and without 8 s of silence in front now gives the same lines, 8 s apart.
+- 0.3.3: owner confirms the take sang exactly those lyrics, still no match (cause not found yet; asked for the
+  take's `.words` file). A take with sound but no phrases found is now listened to whole (it used to be skipped as
+  "nothing sung"); Lyrics Status shows what a take that didn't match heard ("Take 1 heard: ..."), so the owner can
+  see it. Takes heard by older versions are listened to again (hearing version 3).
 - Not yet: ARA takes aren't listened to yet (their audio comes through the ARA reader: later);
   dragging a line's ends by hand (M3/M4, with comping).
 

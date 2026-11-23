@@ -11,6 +11,7 @@ const Song = (() => {
     lines: [],             // { text, section, start, end, startQ, endQ, sure, takes, from, words: [[s, e, heard]], shown: [...] }
     sections: [],          // { name, first, count, start, end }
     linedUp: 0, sungTakes: 0, heardTakes: 0,
+    unmatched: [],         // takes listened to that didn't sing these lyrics: { take, words, heard }
     listening: { now: '', percent: 0, waiting: 0, paused: false, problem: '' },
   };
 
@@ -38,6 +39,7 @@ const Song = (() => {
     st.lines = Array.isArray(m.lines) ? m.lines : [];
     st.sections = Array.isArray(m.sections) ? m.sections : [];
     st.linedUp = m.linedUp || 0; st.sungTakes = m.sungTakes || 0; st.heardTakes = m.heardTakes || 0;
+    st.unmatched = Array.isArray(m.unmatched) ? m.unmatched : [];
     finish();
     changed('lyrics');
   });

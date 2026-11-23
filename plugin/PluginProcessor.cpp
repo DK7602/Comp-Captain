@@ -1054,6 +1054,30 @@ std::shared_ptr<const CompCaptainProcessor::Song> CompCaptainProcessor::song()
         }
     }
     s->lineUp = cc::lineUpSong (s->lyrics, heard);
+    // takes that were listened to but didn't match the lyrics: what they heard, for the Lyrics page
+    if (! s->lyrics.empty())
+    {
+        for (auto& th : heard)
+        {
+            if (s->lineUp.takes.count (th.key) != 0 || th.role == cc::Role::adlib)
+                continue;
+            Song::Unmatched u;
+            u.take = s->takeNames[th.key];
+            u.words = (int) th.words->size();
+            int n = 0;
+            for (auto& w : *th.words)
+            {
+                if (++n > 14)
+                {
+                    u.heard << " ...";
+                    break;
+                }
+                u.heard << fromStd (w.text);
+            }
+            u.heard = u.heard.trim();
+            s->unmatched.push_back (u);
+        }
+    }
     reg.song = s;
     return s;
 }

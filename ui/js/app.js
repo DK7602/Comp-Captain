@@ -40,7 +40,7 @@
     align: JSON.parse(JSON.stringify(D.alignDefaults)),
     exportOn: {},
     sonicology: { voxology: 'installed', mixology: 'installed' },
-    version: '0.3.2', host: 'Browser preview',
+    version: '0.3.3', host: 'Browser preview',
     level: 0,
   };
   if (!PAGES.includes(S.page)) S.page = 'comp';
@@ -546,6 +546,9 @@
       if (SS.linedUp) add('ok', `Lined up on ${SS.linedUp} take${SS.linedUp === 1 ? '' : 's'}`);
       else add('warn', 'These lyrics weren\u2019t heard in any take yet');
       const missing = SS.lines.map((l, i) => (l.takes ? -1 : i)).filter((i) => i >= 0);
+      (SS.unmatched || []).slice(0, 2).forEach((u) => add('warn', u.words
+        ? `${escapeHtml(u.take)} heard: \u201C${escapeHtml(u.heard)}\u201D`
+        : `${escapeHtml(u.take)}: no words heard (is it mostly quiet?)`));
       if (SS.linedUp && missing.length) add('warn', missing.length === 1 ? `Line ${missing[0] + 1} wasn\u2019t heard: check it` : `${missing.length} lines weren\u2019t heard (dimmed)`);
       else if (SS.linedUp) add('ok', 'Every line was found');
     }
