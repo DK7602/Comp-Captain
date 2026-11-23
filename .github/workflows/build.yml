@@ -65,6 +65,9 @@ jobs:
           ARA=build/host-test/CompCaptainAraTest_artefacts/Release/CompCaptainAraTest
           if [ "$RUNNER_OS" = "Linux" ]; then
             xvfb-run -a bash -c 'fluxbox >/dev/null 2>&1 & sleep 2; "$0" "$1"' "$ARA" "$VST3"
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            # if it fails, run it again under the debugger so the log shows where
+            "$ARA" "$VST3" || { lldb --batch -o run -k "bt 40" -k "quit 1" -- "$ARA" "$VST3"; exit 1; }
           else
             "$ARA" "$VST3"
           fi

@@ -398,15 +398,25 @@ int main (int argc, char** argv)
     check (audioAccess->readsOutside.load() == 0, "never asks the DAW for audio past the start or end of a take");
 
     // 8. The DAW takes the take away and closes the song: everything shuts down cleanly.
+    auto step = [] (const char* what) { std::cout << "        closing: " << what << std::endl; };
+    step ("the take leaves the renderer");
     renderer.reset();
+    step ("the take");
     region.reset();
+    step ("its audio modification");
     modification.reset();
+    step ("its audio source");
     source.reset();
+    step ("the track");
     sequence.reset();
+    step ("the song's tempo map");
     context.reset();
     juce::MessageManager::getInstance()->runDispatchLoopUntil (300);
+    step ("the plug-in");
     plugin.reset();
+    step ("the ARA document");
     document.reset();
+    step ("the plug-in file");
     keepLoaded.reset();
     check (true, "closes the song without a crash");
 
