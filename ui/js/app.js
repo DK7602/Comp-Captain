@@ -31,7 +31,7 @@
     align: JSON.parse(JSON.stringify(D.alignDefaults)),
     exportOn: {},
     sonicology: { voxology: 'installed', mixology: 'installed' },
-    version: '0.1.0', host: 'Browser preview',
+    version: '0.1.1', host: 'Browser preview',
     level: 0,
   };
   if (!PAGES.includes(S.page)) S.page = 'comp';
@@ -172,6 +172,7 @@
       const s = h('span', S.time >= wd.end || (S.time >= wd.start && S.time > ln.start) && S.time < ln.end && S.time >= wd.start ? 'sung' : '', (i ? ' ' : '') + wd.w);
       lt.appendChild(s);
     });
+    fitLineText();
     const chips = $('#section-chips'); chips.innerHTML = '';
     const cw = 1672 - 0; // positions in %, so width doesn't matter
     D.sections.forEach((sec, i) => {
@@ -186,6 +187,12 @@
     const s = h('span', '', fmtShort(D.length)); s.style.left = '100%'; ru.appendChild(s);
     drawOverview();
     movePlayheads();
+  }
+  // The current lyric line is big (40px) and only shrinks as much as a long line needs to fit.
+  function fitLineText() {
+    const lt = $('#line-text'); lt.style.fontSize = '';
+    const room = lt.clientWidth, need = lt.scrollWidth;
+    if (room > 0 && need > room) lt.style.fontSize = Math.max(24, Math.floor(40 * room / need)) + 'px';
   }
   function drawOverview() {
     const secColor = (t) => {

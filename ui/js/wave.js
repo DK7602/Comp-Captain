@@ -24,35 +24,48 @@ const Wave = (() => {
   /**
    * opts: t0, t1 (seconds shown), env(t) -> 0..1, color (string or fn(t)), seed, gain, step (px), glow (px), alpha
    */
+  // Drawn on the screen's real pixels: sharp 1-pixel lines on top, with a separate soft glow
+  // underneath, so the waves stay crisp at any window size.
   function draw(canvas, opts) {
     const p = prep(canvas); if (!p) return;
     const { ctx, w, h } = p;
-    const step = opts.step || 1.6;
-    const mid = h / 2;
+    const k = canvas.width / w;                       // real pixels per layout pixel
+    const W = canvas.width, H = canvas.height, mid = Math.round(H / 2) + 0.5;
+    const step = Math.max(2, Math.round((opts.step || 1.6) * k * 0.75)); // in real pixels
     const gain = opts.gain == null ? 0.92 : opts.gain;
-    ctx.globalAlpha = opts.alpha == null ? 1 : opts.alpha;
-    ctx.lineWidth = opts.lineWidth || 1.2;
-    ctx.lineCap = 'round';
-    if (opts.glow !== 0) { ctx.shadowBlur = opts.glow || 6; }
-    let lastColor = null;
-    ctx.beginPath();
-    for (let x = 0; x <= w; x += step) {
-      const t = opts.t0 + (x / w) * (opts.t1 - opts.t0);
-      const color = typeof opts.color === 'function' ? opts.color(t) : opts.color;
-      if (color !== lastColor) {
-        if (lastColor !== null) ctx.stroke();
-        ctx.beginPath(); ctx.strokeStyle = color; ctx.shadowColor = color; lastColor = color;
-      }
-      const n = 0.45 + 0.55 * hash(Math.floor(x / step) + (opts.seed || 0) * 977);
-      const a = Math.min(1, opts.env(t) * n) * mid * gain;
-      ctx.moveTo(x, mid - a); ctx.lineTo(x, mid + a);
+    const alpha = opts.alpha == null ? 1 : opts.alpha;
+    const colorAt = (t) => (typeof opts.color === 'function' ? opts.color(t) : opts.color);
+
+    // work out the columns once
+    const cols = [];
+    for (let X = 0; X <= W; X += step) {
+      const t = opts.t0 + (X / W) * (opts.t1 - opts.t0);
+      const n = 0.45 + 0.55 * hash(Math.floor(X / step) + (opts.seed || 0) * 977);
+      cols.push({ x: X + 0.5, a: Math.max(0.5, Math.min(1, opts.env(t) * n) * (H / 2) * gain), c: colorAt(t) });
     }
-    ctx.stroke();
+    const stroke = (width, a, blur) => {
+      ctx.lineWidth = width; ctx.globalAlpha = alpha * a; ctx.shadowBlur = blur;
+      let last = null;
+      ctx.beginPath();
+      for (const col of cols) {
+        if (col.c !== last) {
+          if (last !== null) ctx.stroke();
+          ctx.beginPath(); ctx.strokeStyle = col.c; ctx.shadowColor = col.c; last = col.c;
+        }
+        ctx.moveTo(col.x, mid - col.a); ctx.lineTo(col.x, mid + col.a);
+      }
+      ctx.stroke();
+    };
+
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.lineCap = 'butt';
+    if (opts.glow !== 0) stroke(Math.max(2, step), 0.35, (opts.glow || 6) * k); // soft halo
+    stroke(Math.max(1, Math.round(k * 0.9)), 1, 0);                            // sharp lines
     // thin bright centre line like the art
-    ctx.shadowBlur = 0; ctx.globalAlpha = (opts.alpha == null ? 1 : opts.alpha) * 0.55;
-    ctx.strokeStyle = typeof opts.color === 'function' ? opts.color(opts.t0) : opts.color;
-    ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(w, mid); ctx.stroke();
-    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0; ctx.globalAlpha = alpha * 0.6; ctx.strokeStyle = colorAt(opts.t0); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(W, mid); ctx.stroke();
+    ctx.restore();
     return p;
   }
 
