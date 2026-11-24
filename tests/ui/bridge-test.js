@@ -51,10 +51,21 @@ const { chromium } = require('playwright');
   check(await p.$eval('#r-arm', (e) => e.classList.contains('recording')), 'the red button pulses while a take records');
   check((await p.textContent('#take-list .tl-row.recording .nm')) === 'Take 3', 'the take being recorded shows in the list');
   check((await p.textContent('#msg-title')).startsWith('Recording Take 3 from bar 9'), 'the Assistant says what is recording: ' + (await p.textContent('#msg-title')));
+  // a take where nothing comes through: it says so while recording, and why it wasn't kept afterwards
+  const quiet = Buffer.from(new Uint8Array(300)).toString('base64');
+  await send({ type: 'capture', armed: true, recording: true, loopTakes: true, ara: false, live: { serial: 2, name: 'Take 3', ppq: 32, bpm: 92, bar: 9, barText: '9', seconds: 3.0, from: 0, perSecond: 100, data: quiet } });
+  await p.waitForTimeout(100);
+  check((await p.textContent('#take-list')).includes('Comp Captain hears nothing on this track'), 'recording silence: the take list says nothing is coming through');
+  check((await p.textContent('#msg-title')).includes('hears nothing'), 'and so does the Assistant');
+  await send({ type: 'capture', armed: true, recording: false, loopTakes: true, ara: false });
+  await send({ type: 'news', items: [{ kind: 'discarded', text: 'Take 3 was silent, so it wasn\'t kept.' }] });
+  await p.waitForTimeout(100);
+  check((await p.textContent('#take-list')).includes('Take 3 was silent') && (await p.textContent('#msg-title')).includes('Take 3 was silent'), 'a pass that wasn\'t kept stays explained while CAPTURE is armed');
   await send({ type: 'capture', armed: true, recording: false, loopTakes: true, ara: false });
   await send({ type: 'news', items: [{ kind: 'saved', text: 'Take 3 saved: starts at bar 9, 0:26 long.' }] });
   await p.waitForTimeout(100);
   check((await p.textContent('#toast')).includes('Take 3 saved'), 'news pops up');
+  check(!(await p.textContent('#take-list')).includes('was silent'), 'a saved take clears the warning');
 
   // take actions
   await p.click('#take-list .tl-row.real .fav-btn');

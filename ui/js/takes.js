@@ -24,6 +24,7 @@ const Takes = (() => {
     capture: { armed: false, recording: false, loopTakes: true, ara: false, live: null },
     live: { serial: 0, data: new Uint8Array(4096), len: 0 },
     sel: null,
+    notKept: '',          // why the last recorded pass wasn't kept (stays until a take is saved)
     ara: false, standalone: false, takesRoot: '',
     report: '',
   };
@@ -97,7 +98,12 @@ const Takes = (() => {
     changed(wasRecording !== st.capture.recording ? 'recording' : 'capture');
   });
   Bridge.on('news', (m) => {
-    (m.items || []).forEach((n) => { lastNews = n; toastFn(n.text, n.kind === 'failed' || n.kind === 'discarded' ? 7000 : 3500); });
+    (m.items || []).forEach((n) => {
+      lastNews = n;
+      if (n.kind === 'discarded' || n.kind === 'failed') st.notKept = n.text;
+      else if (n.kind === 'saved' || n.kind === 'imported') st.notKept = '';
+      toastFn(n.text, n.kind === 'failed' || n.kind === 'discarded' ? 7000 : 3500);
+    });
     changed('news');
   });
   Bridge.on('report', (m) => { st.report = m.text || ''; if (m.copied) toastFn('Copied. Paste it into a chat or an email.'); changed('report'); });
@@ -266,6 +272,19 @@ const Takes = (() => {
       row.oncontextmenu = (e) => { e.preventDefault(); takeMenu(row.querySelector('.more-btn'), t); };
       box.appendChild(row);
     });
+    if (live && hearingNothing()) {
+      const row = document.createElement('div');
+      row.className = 'tl-row warn';
+      row.innerHTML = `<span class="nm">\u26A0 ${esc(NOTHING)}</span>`;
+      box.appendChild(row);
+    } else if (!live && st.notKept) {
+      const row = document.createElement('div');
+      row.className = 'tl-row warn';
+      row.title = 'Click to hide';
+      row.innerHTML = `<span class="nm">\u26A0 ${esc(st.notKept)}</span>`;
+      row.onclick = () => { st.notKept = ''; changed('news'); };
+      box.appendChild(row);
+    }
     if (live) {
       const row = document.createElement('div');
       row.className = 'tl-row recording';
@@ -483,11 +502,24 @@ const Takes = (() => {
     return '';
   }
 
+  // While a take records: true once two seconds have gone by and nothing louder than -60 dB came through
+  // (the track isn't monitoring, or Comp Captain isn't on the track being recorded).
+  function hearingNothing() {
+    const c = st.capture, l = c.live;
+    if (!c.recording || !l || (l.seconds || 0) < 2 || st.live.len < 150) return false;
+    let loudest = 0;
+    for (let i = 0; i < st.live.len; i++) if (st.live.data[i] > loudest) loudest = st.live.data[i];
+    return loudest < 8; // the waveform is stored as sqrt(level) x 255: 8 is about -60 dB
+  }
+  const NOTHING = 'Comp Captain hears nothing on this track. Turn on the track\u2019s monitor (speaker) button, and check Comp Captain is on the track you\u2019re recording.';
+
   // ------------------------------------------------------------------ what the footer says on the Record page
   function status() {
     const c = st.capture;
     if (c.ara || st.ara) return ['Takes from your DAW\'s lanes (ARA)', ['Placed on their real bars', 'Played back unchanged', 'Report in \u2699 Settings']];
+    if (c.recording && c.live && hearingNothing()) return [NOTHING, ['Monitor (speaker) button on', 'Comp Captain on this track', 'Then record again']];
     if (c.recording && c.live) return [`Recording ${c.live.name} from bar ${c.live.barText} \u00B7 ${fmtLen(c.live.seconds)}`, ['Every pass becomes a take', 'Bar-stamped', c.loopTakes ? 'Loop Takes on' : 'Loop Takes off']];
+    if (c.armed && st.notKept) return [st.notKept, ['Monitor (speaker) button on', 'Comp Captain on the track you record', 'Then record again']];
     if (c.armed) return ['Armed: press Record in your DAW', ['Track must be monitoring', 'Every pass becomes a take', 'Bar-stamped']];
     if (lastNews && lastNews.text) return [lastNews.text, [`${st.list.length} take${st.list.length === 1 ? '' : 's'} on this track`, 'Saved with your project', 'Drop files to add more']];
     return [st.list.length ? `${st.list.length} take${st.list.length === 1 ? '' : 's'} on this track` : 'Ready to capture your takes', ['Arm \u25CF then record in your DAW', 'Every pass becomes a take', 'Bar-stamped']];
@@ -543,6 +575,6 @@ const Takes = (() => {
   return {
     st, ROLES, roleLabel, roleColor, onChange, setToast, setMenu,
     setArmed, setLoopTakes, viewTrack, setTrackRole, openFolder, askReport, addFiles, select, selected,
-    renderList, drawRecord, drawLanes, trackMenu, trackLabel, wireDrop, setLyricsDrop, status, playheadPpq, mockStart, fmtLen,
+    renderList, drawRecord, drawLanes, trackMenu, trackLabel, wireDrop, setLyricsDrop, status, playheadPpq, mockStart, fmtLen, hearingNothing,
   };
 })();

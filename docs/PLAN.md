@@ -288,6 +288,12 @@ Pass: on the owner's real takes, lines land within a word of where they belong.
   default 1, with the count-in dots); kept in the web view's local storage. A jump in the playhead (loop, click)
   starts again. Once any line has a time, the teleprompter follows the singing as before. The Record page's Loop
   button is now Loop Takes.
+- 0.3.5 (owner on 0.3.4: "armed CAPTURE, recorded three or four takes, none saved; I see them in Cubase"). The
+  capture code is unchanged since M1, where the owner's single take worked. Passes are thrown away when silent
+  (< -60 dB) or shorter than half a second, with a 7-second message; while armed, the Assistant kept saying "Armed:
+  press Record", so the reason was easy to miss. Now: while a take records and nothing has come through for 2 s, the
+  take list and the Assistant say so (monitor button, Comp Captain on the recorded track); the reason a pass wasn't
+  kept stays in the take list until a take is saved. Manual: Cubase's Direct Monitoring bypasses the track's inserts.
 - Not yet: ARA takes aren't listened to yet (their audio comes through the ARA reader: later);
   dragging a line's ends by hand (M3/M4, with comping).
 

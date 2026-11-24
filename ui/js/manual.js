@@ -23,7 +23,13 @@ your voice only through the track.</li>
 </ol>
 <p>Every pass becomes a take (Take 1, Take 2...), stamped with the bar it started on, and appears in the
 <b>Takes</b> list. While you sing, the take grows in red on the bar ruler. A take that's silent (the track wasn't
-monitoring) or shorter than half a second isn't kept, and the Assistant tells you why.</p>
+monitoring) or shorter than half a second isn't kept: the reason stays in the take list (click it to hide it) until
+the next take is saved. If nothing at all is coming through while you record, the take list says so straight away,
+so you can turn the monitor on and go again.</p>
+<p><b>No takes showing up?</b> Comp Captain hears only what goes <i>through its track</i>. Check three things: it's on
+the same track you're recording; that track's <b>monitor</b> (speaker) button is on; and in Cubase's
+<b>Studio Setup &gt; your audio interface</b>, <b>Direct Monitoring</b> is off (with it on, your voice goes straight to
+your headphones and never passes through the track's plug-ins).</p>
 <p><b>Loop Takes</b> (bottom of the Record page): on, every time your DAW's loop (cycle) comes round you get a fresh
 take. Off, only the first pass is kept until you press Record again.</p>
 <p>Click the red button again to disarm when you're done, so it doesn't capture when you record other tracks.
