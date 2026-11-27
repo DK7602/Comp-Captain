@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 
 # The version lives here (and only here). It shows in the DAW, the ⚙ window and the manual.
-project(CompCaptain VERSION 0.3.5 LANGUAGES C CXX)
+project(CompCaptain VERSION 0.3.6 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

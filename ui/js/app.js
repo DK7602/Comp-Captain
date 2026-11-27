@@ -44,7 +44,7 @@
     align: JSON.parse(JSON.stringify(D.alignDefaults)),
     exportOn: {},
     sonicology: { voxology: 'installed', mixology: 'installed' },
-    version: '0.3.5', host: 'Browser preview',
+    version: '0.3.6', host: 'Browser preview',
     level: 0,
   };
   if (!PAGES.includes(S.page)) S.page = 'comp';
@@ -75,11 +75,22 @@
   }
 
   // ------------------------------------------------------------------ stage scaling
+  // The whole page fits the window. In a wide, short window (Cubase's lower zone, where an Extension opens)
+  // fitting everything would make it too small to read: then it stays readable and scrolls up and down.
   function fitStage() {
-    const s = Math.min(window.innerWidth / 1672, window.innerHeight / 941);
+    const w = window.innerWidth, hgt = window.innerHeight;
+    const fit = Math.min(w / 1672, hgt / 941), readable = 0.6;
+    let s = fit, scroll = false;
+    if (fit < readable && w / 1672 > fit) {
+      s = Math.min(w / 1672, readable);
+      scroll = 941 * s > hgt + 1;
+    }
+    document.documentElement.style.overflowY = scroll ? 'auto' : 'hidden';
+    document.body.style.overflowY = scroll ? 'visible' : 'hidden';
+    document.body.style.height = scroll ? Math.ceil(941 * s) + 'px' : '';
     stage.style.transform = `scale(${s})`;
-    stage.style.left = Math.max(0, (window.innerWidth - 1672 * s) / 2) + 'px';
-    stage.style.top = Math.max(0, (window.innerHeight - 941 * s) / 2) + 'px';
+    stage.style.left = Math.max(0, (w - 1672 * s) / 2) + 'px';
+    stage.style.top = scroll ? '0px' : Math.max(0, (hgt - 941 * s) / 2) + 'px';
     Wave.setStageScale(s);
     redrawCanvases();
   }

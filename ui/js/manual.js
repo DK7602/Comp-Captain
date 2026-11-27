@@ -70,6 +70,9 @@ the track's role; takes recorded on it take that role.</p>
 <p>If you recorded takes in Cubase (cycle recording makes one lane per take), select those events on the track, then
 choose <b>Audio &gt; Extensions &gt; Comp Captain</b>. Comp Captain lists every take Cubase hands over, on its real
 bar (from your project's tempo and time signatures), and plays them back exactly as they are.</p>
+<p>Cubase shows an Extension in the lower part of the project window. If that space is short, Comp Captain stays
+readable and you scroll it up and down with the mouse wheel; Cubase's arrow button at the top right of that area
+opens it in its own window, which you can make bigger.</p>
 <p>This part is a test: we're finding out how much Cubase Artist shares. Open <b>&#x2699; Settings</b> and click
 <b>Copy</b> next to ARA: it copies a plain report of what Cubase sent. Paste it into the chat so it can be checked.</p>
 

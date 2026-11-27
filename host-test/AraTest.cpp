@@ -385,6 +385,13 @@ int main (int argc, char** argv)
         check (editor != nullptr && editor->isResizable(), "its window opens in ARA mode and can be resized");
         if (editor != nullptr)
         {
+            // Cubase shows an Extension in the project window's lower zone: wide and short. The window must take
+            // that space as it is (as an insert it keeps the art's 16:9 shape).
+            juce::Rectangle<int> wanted (0, 0, 1400, 470);
+            if (auto* c = editor->getConstrainer())
+                c->checkBounds (wanted, editor->getBounds(), { 0, 0, 10000, 10000 }, false, false, true, true);
+            check (wanted.getWidth() == 1400 && wanted.getHeight() == 470,
+                   "as an Extension it takes a wide, short space as it is (got " + juce::String (wanted.getWidth()) + " x " + juce::String (wanted.getHeight()) + ")");
             editor->setTopLeftPosition (40, 40);
             editor->addToDesktop (0);
             editor->setVisible (true);

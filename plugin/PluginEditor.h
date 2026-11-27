@@ -30,6 +30,10 @@ public:
     bool isInterfaceReady() const noexcept { return uiReady; }
 
 private:
+    // As a DAW insert the window keeps the art's 16:9 shape. Opened as an ARA Extension (Cubase shows it in the
+    // project window's lower zone, wide and short) it takes whatever size it's given, and the page fits itself in.
+    void applySizeRules();
+    bool embedded = false;
     void timerCallback() override;
     void handleUiEvent (const juce::var& message);
     void sendInit();

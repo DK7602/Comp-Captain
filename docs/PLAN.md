@@ -196,7 +196,10 @@ Extensions > Comp Captain shared: 1 region sequence (track "Comp Captain test"),
 readable), 1 playback region ("Take 6" at bar 2.3 = 3.000 s, 0:09), and the song's tempo map (2 tempo points, 1 time
 signature). The copy that wrote the report had the editor view + editor renderer roles, not the playback renderer
 (another copy plays). Only the selected events are shared: select every lane take before choosing the Extension.
-Open: does the take play back unchanged (asked); several takes at once not tried yet. What's in it:
+Open: does the take play back unchanged (asked); several takes at once not tried yet. Cubase shows the Extension in
+the project window's lower zone (wide and short, ~1400 x 470 in the owner's screenshot): the 16:9 window was cut off
+and couldn't scroll. 0.3.6: as an ARA editor the window takes any size (no fixed shape, nothing saved), and the page
+fits; below 60% it stays at 60% wide-fit and scrolls vertically. What's in it:
 - **CAPTURE** (engine `Capture`): armed by the red button (a non-automatable "CAPTURE armed" parameter, never armed
   when a project opens). While armed and the DAW records, the audio thread copies the track's sound into a lock-free
   ring; a shared background thread writes 32-bit float WAVs (header kept current, so a crash keeps the take) to

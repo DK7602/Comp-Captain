@@ -75,10 +75,7 @@ CompCaptainEditor::CompCaptainEditor (CompCaptainProcessor& p)
 
     const auto state = processor.getUiState();
     setResizable (true, true);
-    setResizeLimits (cc::UiState::artWidth / 2, (int) std::lround (cc::UiState::artHeight * cc::UiState::minScale),
-                     (int) std::lround (cc::UiState::artWidth * cc::UiState::maxScale), (int) std::lround (cc::UiState::artHeight * cc::UiState::maxScale));
-    if (auto* c = getConstrainer())
-        c->setFixedAspectRatio ((double) cc::UiState::artWidth / (double) cc::UiState::artHeight);
+    applySizeRules();
     setSize (state.windowWidth(), state.windowHeight());
 
     browser.goToURL (juce::WebBrowserComponent::getResourceProviderRoot());
@@ -115,9 +112,30 @@ void CompCaptainEditor::paint (juce::Graphics& g)
     g.fillAll (backgroundNavy); // shows for a moment while the interface loads
 }
 
+void CompCaptainEditor::applySizeRules()
+{
+#if JucePlugin_Enable_ARA
+    embedded = isARAEditorView();
+#endif
+    if (embedded)
+    {
+        // any shape the DAW gives us (the page letterboxes, or scrolls when it would be too small to read)
+        if (auto* c = getConstrainer())
+            c->setFixedAspectRatio (0.0);
+        setResizeLimits (320, 180, 4000, 3000);
+        return;
+    }
+    setResizeLimits (cc::UiState::artWidth / 2, (int) std::lround (cc::UiState::artHeight * cc::UiState::minScale),
+                     (int) std::lround (cc::UiState::artWidth * cc::UiState::maxScale), (int) std::lround (cc::UiState::artHeight * cc::UiState::maxScale));
+    if (auto* c = getConstrainer())
+        c->setFixedAspectRatio ((double) cc::UiState::artWidth / (double) cc::UiState::artHeight);
+}
+
 void CompCaptainEditor::resized()
 {
     browser.setBounds (getLocalBounds());
+    if (embedded)
+        return; // the DAW decides an Extension's size: nothing to remember
     const auto scale = cc::clampScale ((double) getWidth() / (double) cc::UiState::artWidth);
     updateState ([scale] (cc::UiState& s) { s.windowScale = scale; });
 }
@@ -577,6 +595,12 @@ void CompCaptainEditor::timerCallback()
 
     if (++tick % 3 != 0)
         return; // the rest ten times a second
+
+#if JucePlugin_Enable_ARA
+    // the DAW may make this copy an ARA editor after the window opened
+    if (isARAEditorView() != embedded)
+        applySizeRules();
+#endif
 
     sendCapture (false);
     sendTransport (false);
