@@ -384,6 +384,24 @@ const Takes = (() => {
     });
   }
 
+  // One take's waveform over a stretch of the song's bars (quarters q0..q1): the Comp page's take rows.
+  function drawTakeSpan(canvas, id, q0, q1) {
+    const t = st.list.find((x) => x.id === id);
+    if (!t) return Wave.draw(canvas, { t0: q0, t1: q1, env: () => -1, color: '#ffc531', glow: 0, noise: false });
+    if (!st.peaks[t.id] && !st.asked[t.id] && t.hasPeaks) { st.asked[t.id] = true; Bridge.send('getPeaks', { ids: [t.id] }); }
+    Wave.draw(canvas, { t0: q0, t1: q1, env: envFor(t), color: roleColor(t.role), seed: 3, step: 1.5, glow: 6, noise: false });
+  }
+  // A take's short tag: "T3" for "Take 3", else its first letters.
+  function shortName(id) {
+    const t = st.list.find((x) => x.id === id);
+    if (!t) return '?';
+    const m = /(\d+)\s*$/.exec(t.name);
+    return m ? 'T' + m[1] : t.name.slice(0, 3);
+  }
+  const takeColors = ['#19d3ff', '#b05cff', '#2bea7a', '#6b7bff', '#ff5fc4', '#ffb340', '#4df0e0', '#ff7a5c'];
+  function envOf(id) { const t = st.list.find((x) => x.id === id); return t ? envFor(t) : null; }
+  function colorOf(id) { const i = st.list.findIndex((x) => x.id === id); return takeColors[(i < 0 ? 0 : i) % takeColors.length]; }
+
   // ------------------------------------------------------------------ the track picker (top left)
   function trackMenu(anchor) {
     if (!menuImpl) return;
@@ -576,5 +594,6 @@ const Takes = (() => {
     st, ROLES, roleLabel, roleColor, onChange, setToast, setMenu,
     setArmed, setLoopTakes, viewTrack, setTrackRole, openFolder, askReport, addFiles, select, selected,
     renderList, drawRecord, drawLanes, trackMenu, trackLabel, wireDrop, setLyricsDrop, status, playheadPpq, mockStart, fmtLen, hearingNothing,
+    drawTakeSpan, shortName, colorOf, envOf,
   };
 })();

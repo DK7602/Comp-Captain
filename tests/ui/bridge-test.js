@@ -253,6 +253,53 @@ const { chromium } = require('playwright');
   await p.click('.menu .menu-item:has-text("4 bars")');
   check((await p.textContent('#rec-scroll-text')) === 'Every 4 bars', 'the Lines button changes the bars per line');
 
+  // ---------------------------------------------------------------- M3: scores
+  await send({ type: 'tracks', tracks: [{ id: '7', name: 'Lead Vox', role: 'lead', takes: 3, ara: false, self: true, viewing: true }] });
+  await send({ type: 'takes', takes: [take('t1', 'Take 1', 9), take('t2', 'Take 2', 9, { fav: true }), take('t3', 'Take 3', 9)], track: 'self', trackName: 'Lead Vox', trackRole: 'lead', folder: 'C:/x', importing: 0 });
+  await send({ type: 'lyrics', text: lyricsText, linedUp: 3, sungTakes: 3, heardTakes: 3, unmatched: [],
+    sections: [{ name: 'Verse 1', first: 0, count: 2 }, { name: 'Chorus', first: 2, count: 1 }],
+    lines: [line('I was lost in the dark', 0, 21.0, 23.4), line('but You found me', 0, 24.0, 25.6), line('I\'m alive, I\'m alive', 1, 27.0, 29.0)] });
+  const sc = (id, p, t, c, e, extra) => Object.assign({ id, p, t, c, e, good: [], bad: [], problems: [] }, extra || {});
+  await send({ type: 'scores', ready: true, any: true, style: 'Singing', weights: [0.35, 0.25, 0.2, 0.2], picks: {},
+    lines: [{ line: 0, takes: [sc('t1', 90, 90, 90, 90, { bad: ['Flat on "dark" (about 40 cents)'] }), sc('t2', 95, 95, 95, 95, { good: ['Every word comes through clearly'] }), sc('t3', 97, 97, 97, 97, { problems: ['Clipped on "lost" (too loud for the input)'] })] },
+            { line: 1, takes: [sc('t1', 99, 99, 99, 99), sc('t2', 80, 80, 80, 80)] }] });
+  await p.click('.nav-btn[data-go="comp"]');
+  await p.click('#view-seg button[data-view="line"]');
+  await p.click('#section-chips .chip:first-child');
+  await p.waitForTimeout(100);
+  const takeRows = await p.$$eval('#take-rows .take-row', (r) => r.map((x) => x.querySelector('.name').textContent + '|' + x.querySelector('.total').textContent + '|' + x.classList.contains('chosen')));
+  check(takeRows.join() === 'Take 1|90%|false,Take 2|95%|true,Take 3|94%|false', 'the Comp page shows every take of the line with its total, the best one ticked (' + takeRows.join(', ') + ')');
+  check((await p.textContent('#take-rows .take-row:nth-child(3) .warn-badge')) !== '', 'a take with a problem shows the warning');
+  check((await p.textContent('#reasons')).includes('Every word comes through clearly') && (await p.textContent('#sc-best')).includes('Best: Take 2'), 'Line Scores shows the chosen take and why');
+  await sent();
+  await p.click('#take-rows .take-row:nth-child(1) .name');
+  out = await sent();
+  check(out.some((m) => m.type === 'pick' && m.line === 0 && m.id === 't1' && m.text === 'I was lost in the dark'), 'clicking a take picks it for the line');
+  await p.waitForTimeout(50);
+  check(await p.$eval('#take-rows .take-row:nth-child(1)', (e) => e.classList.contains('chosen') && e.classList.contains('mine')), 'your pick is ticked');
+  await p.click('#undo');
+  out = await sent();
+  check(out.some((m) => m.type === 'picksSet' && Object.keys(m.picks).length === 0), 'Undo takes the pick back');
+  await p.click('#comp-style');
+  await p.click('.menu .menu-item:has-text("Rap")');
+  await p.waitForTimeout(350);
+  out = await sent();
+  check(out.some((m) => m.type === 'style' && m.name === 'Rap' && m.weights[0] === 0), 'the style menu sends Rap (pitch doesn\'t count)');
+  check((await p.textContent('#take-rows .take-row:nth-child(2) .total')) === '95%' && (await p.textContent('#comp-style-name')) === 'Rap', 'the totals are re-weighed at once');
+  await p.click('.nav-btn[data-go="review"]');
+  await p.waitForTimeout(100);
+  const reviewRows = await p.$$eval('#review-rows .rv', (r) => r.map((x) => x.querySelector('.tg') ? x.querySelector('.tg').textContent : '-'));
+  check(reviewRows.join() === 'T2,T1,-', 'Review lists every line with its chosen take (' + reviewRows.join(', ') + ')');
+  await send({ type: 'scores', ready: true, any: true, style: 'Rap', weights: [0, 0.35, 0.35, 0.3], picks: { 0: { id: 't1', text: 'I was lost in the dark' }, 1: { id: 't1', text: 'but You found me' } },
+    lines: [{ line: 0, takes: [sc('t1', 90, 90, 90, 90), sc('t2', 95, 95, 95, 95)] }, { line: 1, takes: [sc('t1', 99, 99, 99, 99), sc('t2', 80, 80, 80, 80)] }] });
+  await p.waitForTimeout(100);
+  check((await p.textContent('#msg-title')).includes('matches Comp Captain\u2019s on 1 of 2 lines'), 'Review counts how often your picks match Comp Captain\'s');
+  await sent();
+  await p.click('.nav-btn[data-go="comp"]');
+  await p.click('#auto-comp');
+  out = await sent();
+  check(out.some((m) => m.type === 'picksSet' && Object.keys(m.picks).length === 0), 'Auto Comp lets Comp Captain pick every line');
+
   check(errors.length === 0, 'no script errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
   await b.close();
 })();

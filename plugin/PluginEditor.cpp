@@ -273,6 +273,20 @@ void CompCaptainEditor::handleUiEvent (const juce::var& message)
         withViewed ([] (CompCaptainProcessor& p) { p.clearPicks(); });
         sendScores (true);
     }
+    else if (type == "picksSet")
+    {
+        std::map<int, CompCaptainProcessor::Pick> all;
+        if (auto* o = message.getProperty ("picks", {}).getDynamicObject())
+            for (auto& prop : o->getProperties())
+            {
+                const int line = prop.name.toString().getIntValue();
+                const auto take = ownId (prop.value.getProperty ("id", {}).toString());
+                if (line >= 0 && take)
+                    all[line] = { *take, prop.value.getProperty ("text", {}).toString().toStdString() };
+            }
+        withViewed ([&] (CompCaptainProcessor& p) { p.setPicks (all); });
+        sendScores (true);
+    }
     else if (type == "style")
     {
         const auto w = message.getProperty ("weights", {});

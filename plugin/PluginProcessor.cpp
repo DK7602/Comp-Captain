@@ -1054,6 +1054,16 @@ void CompCaptainProcessor::setPick (int line, std::uint32_t take, const std::str
     updateHostDisplay (ChangeDetails().withNonParameterStateChanged (true));
 }
 
+void CompCaptainProcessor::setPicks (std::map<int, Pick> all)
+{
+    {
+        const std::scoped_lock lock (stateLock);
+        picked = std::move (all);
+    }
+    scoresChanged.fetch_add (1);
+    updateHostDisplay (ChangeDetails().withNonParameterStateChanged (true));
+}
+
 void CompCaptainProcessor::clearPicks()
 {
     {

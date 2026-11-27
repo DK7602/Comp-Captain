@@ -707,3 +707,17 @@ svg { display: block; }
 .tl-row.warn { height: auto; min-height: 34px; padding: 6px 10px; border-color: rgba(255, 176, 32, .7); background: rgba(255, 160, 20, .12); cursor: pointer; }
 .tl-row.warn .nm { width: auto; flex: 1; white-space: normal; font-size: 14.5px; line-height: 1.35; color: #ffc860; }
 #stage[data-theme="light"] .tl-row.warn .nm { color: #9a5a00; }
+/* M3: real scores */
+#stage[data-host="1"] .takes-box > .sample-badge, #stage[data-host="1"] .page[data-page="review"] > .sample-badge { display: none; }
+.rows-empty { padding: 26px 18px; font-size: 17px; line-height: 1.5; color: var(--text-2); text-align: center; }
+.take-row .fav { color: #ff5f8a; font-size: 14px; margin-left: -8px; }
+.take-row.mine .name::after { content: " \2022"; color: var(--gold-text); }
+.score.none { color: var(--text-3); }
+.reasons li.b::before { content: "\2022"; color: #ffb020; }
+.reasons li.none::before { content: ""; margin: 0; }
+.reasons li.none { color: var(--text-3); }
+.bc-tag.mine { outline: 2px solid #ffd04a; outline-offset: 1px; }
+.rv.flag { background: rgba(255, 160, 20, .08); }
+.rv.flag .total { border-color: rgba(255, 176, 32, .8); }
+.rv.none .txt { color: var(--text-3); }
+.rv .tg.mine { outline: 2px solid #ffd04a; outline-offset: 1px; }

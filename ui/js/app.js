@@ -15,6 +15,9 @@
   const D = Demo;
   const T = Takes, TS = Takes.st;
   const SG = Song, SS = Song.st;
+  const SCR = Scores, SCS = Scores.st;
+  const realScores = () => Bridge.inHost;  // inside the plug-in the scores are real (M3); a browser shows the sample song
+  if (Bridge.inHost) stage.dataset.host = '1';
   const real = () => TS.real;
   if (real()) stage.dataset.real = '1';
   const PAGES = ['record', 'lyrics', 'comp', 'tighten', 'review', 'export'];
@@ -28,6 +31,7 @@
     sl: 0,              // the song's current lyric line (lyric bar, teleprompter, Lyrics page)
     following: false,   // the lit line follows the DAW's playhead
     lyrUndo: null,      // the lyrics before the last Paste / Open / Hear It
+    pickUndo: [], pickRedo: [],   // your picks before each change (real scores)
     // Beat scroll: before any take has been listened to, the words move on with the beat
     beat: { bars: Math.max(1, parseInt(Bridge.localGet('beatBars', '2'), 10) || 2), lead: Math.max(0, parseInt(Bridge.localGet('beatLead', '1'), 10) || 0), anchorQ: null },
     beatFollow: false,  // the words are moving with the beat right now
@@ -44,7 +48,7 @@
     align: JSON.parse(JSON.stringify(D.alignDefaults)),
     exportOn: {},
     sonicology: { voxology: 'installed', mixology: 'installed' },
-    version: '0.3.6', host: 'Browser preview',
+    version: '0.4.0', host: 'Browser preview',
     level: 0,
   };
   if (!PAGES.includes(S.page)) S.page = 'comp';
@@ -159,6 +163,7 @@
     S.page = p; stage.dataset.page = p; Bridge.localSet('page', p);
     $$('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.go === p));
     if (tell) Bridge.send('page', { value: p });
+    if (p === 'review') renderReview();
     renderFooter(); redrawCanvases();
   }
   function setCompView(v, tell) {
@@ -279,6 +284,7 @@
   const compSpan = () => [D.lines[0].start - 0.6, D.lines[D.lines.length - 1].end + 0.6];
   function scoreCell(v, cls) { return `<div class="score ${cls || ''}">${v}%<i style="--w:${Math.max(0, (v - 60) / 40 * 100)}%"></i></div>`; }
   function renderComp() {
+    if (realScores()) { renderCompReal(); return; }
     const li = S.line, ln = D.lines[li], chosen = S.choice[li];
     const sec = D.sections[ln.section];
     $('#li-count').textContent = `Line ${li + 1} of ${D.lines.length} | ${sec.name}`;
@@ -366,6 +372,108 @@
     renderScorePanel();
     movePlayheads();
   }
+  // ------------------------------------------------------------------ COMP page with real scores (inside the plug-in)
+  const takeName = (id) => { const t = TS.list.find((x) => x.id === id); return t ? t.name : 'a take'; };
+  const scoreCellReal = (v, cls) => (v == null || v < 0 ? `<div class="score ${cls || ''} none" title="Not scored">\u2013</div>` : scoreCell(Math.round(v), cls));
+  function renderCompReal() {
+    renderLineViewReal();
+    T.drawLanes($('#lanes'), $('#lane-lyrics'), laneBand());
+    renderBestCompReal();
+    renderScorePanelReal();
+    movePlayheads();
+  }
+  // Why there are no scores for the current line, in plain words.
+  function noScoresMessage(li) {
+    if (!SS.lines.length) return 'Add your lyrics on the Lyrics page: then every line of every take gets a score.';
+    if (!TS.list.length) return 'Record a few takes of this part (or add them with +): every line of every take gets a score.';
+    if (!SCS.any || (!SCS.ready && !SCR.takesOf(li).length)) return SS.listening.now ? `Listening to ${SS.listening.now}\u2026 the scores follow.` : 'Scoring your takes\u2026';
+    return 'No take sang this line yet.';
+  }
+  // Line view: every take of the current line with its four scores, any problem, and the total. Click a take to pick it.
+  function renderLineViewReal() {
+    const li = S.sl, ln = SS.lines[li], sec = ln ? SS.sections[ln.section] : null;
+    $('#li-count').textContent = ln ? `Line ${li + 1} of ${SS.lines.length}${sec ? ' | ' + sec.name : ''}` : 'No lyrics yet';
+    $('#li-text').textContent = ln ? `\u201C${ln.text}\u201D` : '';
+    $('#track-name').textContent = T.trackLabel();
+    const rows = $('#take-rows'); rows.innerHTML = '';
+    const list = SCR.takesOf(li).slice().sort((a, b) => TS.list.findIndex((t) => t.id === a.id) - TS.list.findIndex((t) => t.id === b.id));
+    if (!ln || !list.length) { rows.appendChild(h('div', 'rows-empty', escapeHtml(noScoresMessage(li)))); return; }
+    const chosen = SCR.chosen(li), best = SCR.best(li), mine = SCR.pickOf(li);
+    const q0 = ln.startQ >= 0 ? ln.startQ - 0.5 : -1, q1 = ln.endQ >= 0 ? ln.endQ + 0.5 : -1;
+    list.forEach((sc) => {
+      const tk = TS.list.find((t) => t.id === sc.id);
+      const r = h('div', 'take-row' + (sc.id === chosen ? ' chosen' : '') + (sc.id === mine ? ' mine' : ''));
+      const warn = (sc.problems || []).join('\n');
+      r.title = sc.id === mine ? 'Your pick for this line (click again to let Comp Captain choose)' : (sc.id === best ? 'Comp Captain\u2019s best take for this line' : 'Click to pick this take for the line');
+      r.innerHTML = `<span class="check">\u2713</span><button class="sq" title="Hear this take (arrives in M4)">${icon('i-play')}</button>
+        <span class="name">${escapeHtml(tk ? tk.name : sc.id)}</span>${tk && tk.fav ? '<span class="fav" title="Favourite">\u2665</span>' : ''}<canvas></canvas>
+        <span class="warn-badge" title="${escapeHtml(warn)}">${warn ? '\u26A0' : ''}</span>
+        <div class="scores">${scoreCellReal(sc.p)}${scoreCellReal(sc.t)}${scoreCellReal(sc.c)}${scoreCellReal(sc.e, 'e')}<div class="total">${Math.round(SCR.total(sc))}%</div></div>`;
+      r.onclick = (e) => {
+        if (e.target.closest('.sq')) return toast('Hearing a take on its own arrives in M4 (Comp). For now, play it in your DAW.');
+        pickTake(li, sc.id === mine ? null : sc.id);
+      };
+      rows.appendChild(r);
+      if (q0 >= 0) T.drawTakeSpan($('canvas', r), sc.id, q0, q1);
+    });
+  }
+  // Your pick for a line (null: let Comp Captain choose), with undo.
+  function pickTake(li, id) {
+    S.pickUndo.push(SCR.snapshot()); S.pickRedo = [];
+    SCR.setPick(li, id);
+    toast(id ? `Line ${li + 1}: you picked ${takeName(id)}.` : `Line ${li + 1}: back to Comp Captain\u2019s choice (${takeName(SCR.best(li))}).`);
+  }
+  // Best comp: the chosen take of every line along the song (the finished comp is built in M4).
+  function renderBestCompReal() {
+    const timed = SS.lines.map((l, i) => ({ l, i })).filter((x) => x.l.startQ >= 0 && SCR.chosen(x.i));
+    if (!timed.length) {
+      Wave.draw($('#bc-canvas'), { t0: 0, t1: 1, env: () => -1, color: '#ffc531', glow: 0, noise: false });
+      $('#bc-tags').innerHTML = `<div class="bc-note">${escapeHtml(SS.lines.length ? 'The best take for every line shows here once your takes are scored.' : 'Add your lyrics and record a few takes: the best take for every line shows here.')}</div>`;
+      return;
+    }
+    const q0 = timed[0].l.startQ - 1, q1 = timed[timed.length - 1].l.endQ + 1;
+    const envs = {};
+    timed.forEach((x) => { const id = SCR.chosen(x.i); if (!envs[id]) envs[id] = T.envOf(id); });
+    Wave.draw($('#bc-canvas'), { t0: q0, t1: q1, env: (q, dq) => {
+      const x = timed.find((y) => q >= y.l.startQ - 0.25 && q <= y.l.endQ + 0.25);
+      if (!x) return -1;
+      const e = envs[SCR.chosen(x.i)];
+      return e ? e(q, dq) : -1;
+    }, color: '#ffc531', seed: 9, step: 1.6, glow: 7, noise: false });
+    const tags = $('#bc-tags'); tags.innerHTML = '';
+    timed.forEach((x) => {
+      const id = SCR.chosen(x.i), mine = SCR.pickOf(x.i);
+      const tg = h('div', 'bc-tag' + (mine ? ' mine' : ''), escapeHtml(T.shortName(id)));
+      tg.style.left = (((x.l.startQ + x.l.endQ) / 2 - q0) / (q1 - q0) * 100) + '%';
+      const c = T.colorOf(id);
+      tg.style.background = `linear-gradient(180deg, ${c}, ${shade(c)})`;
+      tg.title = `Line ${x.i + 1}: ${takeName(id)}${mine ? ' (your pick)' : ''}`;
+      tg.onclick = () => setLine(x.i, true);
+      if (x.i === S.sl) tg.style.boxShadow = '0 0 0 2px #ffd04a, 0 0 10px #ffb000';
+      tags.appendChild(tg);
+    });
+    tags.appendChild(h('div', 'p-head small'));
+  }
+  // Line Scores (right panel): the chosen take's four scores and total, and why.
+  function renderScorePanelReal() {
+    const li = S.sl, id = SCR.chosen(li), sc = id ? SCR.scoreOf(li, id) : null, best = SCR.best(li), mine = SCR.pickOf(li);
+    $('#sc-best').textContent = !sc ? '' : mine ? (mine === best ? `(Your pick: ${takeName(mine)}, also the best)` : `(Your pick: ${takeName(mine)} \u00B7 best: ${takeName(best)})`) : `(Best: ${takeName(id)})`;
+    const box = $('#score-sliders'); box.innerHTML = '';
+    const rows = [['i-fork', 'Pitch', sc && sc.p], ['i-clock', 'Timing', sc && sc.t], ['i-gem', 'Clarity', sc && sc.c], ['i-bolt', 'Energy', sc && sc.e], ['i-star', 'Total (Line)', sc ? Math.round(SCR.total(sc)) : null, 'tot']];
+    rows.forEach(([ic, name, v, cls]) => {
+      const has = v != null && v >= 0;
+      const r = h('div', 'ss ' + (cls || ''), `${icon(ic)}<span>${name}</span>${sliderHTML(has ? v / 100 : 0)}<span class="val">${has ? Math.round(v) + '%' : '\u2013'}</span>`);
+      box.appendChild(r); bindSlider($('.slider', r));
+      $('.slider', r).style.pointerEvents = 'none';
+    });
+    const reasons = $('#reasons'); reasons.innerHTML = '';
+    if (!sc) { reasons.appendChild(h('li', 'none', escapeHtml(noScoresMessage(li)))); return; }
+    (sc.good || []).slice(0, 4).forEach((t) => reasons.appendChild(h('li', '', escapeHtml(t))));
+    (sc.bad || []).forEach((t) => reasons.appendChild(h('li', 'b', escapeHtml(t))));
+    (sc.problems || []).forEach((t) => reasons.appendChild(h('li', 'w', escapeHtml(t))));
+    if (!reasons.children.length) reasons.appendChild(h('li', 'none', 'Nothing stands out on this line.'));
+  }
+
   function renderBestCompNote() {
     Wave.draw($('#bc-canvas'), { t0: 0, t1: 1, env: () => -1, color: '#ffc531', glow: 0, noise: false });
     $('#bc-tags').innerHTML = '<div class="bc-note">Your best comp is built here from your real takes once scores (M3) are in. Your lyrics are already lined up.</div>';
@@ -373,6 +481,7 @@
   function shade(hex) { const n = parseInt(hex.slice(1), 16); const f = (v) => Math.round(v * 0.45); return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`; }
 
   function renderScorePanel() {
+    if (realScores()) { renderScorePanelReal(); return; }
     const li = S.line, ti = S.choice[li], sc = D.scores[li][ti];
     $('#sc-best').textContent = `(Chosen: T${ti + 1}${ti === bestTake(li) ? ', best' : ''})`;
     const rows = [['i-fork', 'Pitch', sc.p], ['i-clock', 'Timing', sc.t], ['i-gem', 'Clarity', sc.c], ['i-bolt', 'Energy', sc.e], ['i-star', 'Total (Line)', Math.round(total(sc, S.weights)), 'tot']];
@@ -709,6 +818,7 @@
 
   // ------------------------------------------------------------------ REVIEW page
   function renderReview() {
+    if (realScores()) { renderReviewReal(); return; }
     const rows = $('#review-rows'); if (!rows) return; rows.innerHTML = '';
     D.lines.forEach((l, i) => {
       const ti = S.choice[i], sc = D.scores[i][ti], tk = D.takes[ti];
@@ -737,7 +847,44 @@
     });
     $('#comp-style-name').textContent = S.style;
   }
+  // Review with real scores: every line with the chosen take and its scores; lines with a problem or a low total are
+  // flagged. The style and its weights (right panel) re-weigh everything at once.
+  function renderReviewReal() {
+    const rows = $('#review-rows'); if (!rows) return; rows.innerHTML = '';
+    if (!SS.lines.length) rows.appendChild(h('div', 'rows-empty', 'Add your lyrics on the Lyrics page, then record a few takes: every line gets scored here.'));
+    SS.lines.forEach((l, i) => {
+      const id = SCR.chosen(i), sc = id ? SCR.scoreOf(i, id) : null, sec = SS.sections[l.section];
+      const tot = sc ? Math.round(SCR.total(sc)) : null, warn = sc ? (sc.problems || []) : [];
+      const flagged = !!sc && (warn.length > 0 || tot < 75);
+      const c = id ? T.colorOf(id) : '#555';
+      const cell = (v) => (v == null || v < 0 ? '<span>\u2013</span>' : `<span>${Math.round(v)}%</span>`);
+      const r = h('div', 'rv' + (flagged ? ' flag' : '') + (sc ? '' : ' none'), `<span class="n">${i + 1}</span><span class="sec">${escapeHtml(sec ? sec.name : '')}</span><span class="txt">${escapeHtml(l.text)}</span><span class="w" title="${escapeHtml(warn.join('\n'))}">${warn.length ? '\u26A0' : ''}</span>
+        <div class="cells">${sc ? `<span class="tg${SCR.pickOf(i) ? ' mine' : ''}" style="background:linear-gradient(180deg,${c},${shade(c)})">${escapeHtml(T.shortName(id))}</span>` : '<span>\u2013</span>'}${cell(sc && sc.p)}${cell(sc && sc.t)}${cell(sc && sc.c)}${cell(sc && sc.e)}<div class="total">${tot == null ? '\u2013' : tot + '%'}</div></div>`);
+      r.title = sc ? [...(sc.bad || []), ...warn].join('\n') || 'Click to see every take of this line' : 'No take sang this line yet';
+      r.onclick = () => { setLine(i, true); setPage('comp', true); };
+      rows.appendChild(r);
+    });
+    const grid = $('#style-grid'); grid.innerHTML = '';
+    SCR.STYLES.forEach(([name]) => {
+      const b = h('button', name === SCS.style ? 'on' : '', escapeHtml(name));
+      b.onclick = () => { SCR.setStyle(name); toast(`Style: ${name}. Scores re-weighed.`); };
+      grid.appendChild(b);
+    });
+    const ws = $('#weight-sliders'); ws.innerHTML = '';
+    [['i-fork', 'Pitch', 'p'], ['i-clock', 'Timing', 't'], ['i-gem', 'Clarity', 'c'], ['i-bolt', 'Energy', 'e']].forEach(([ic, name, k]) => {
+      const v = SCS.weights[k];
+      const r = h('div', 'ss', `${icon(ic)}<span>${name}</span>${sliderHTML(v / 0.5)}<span class="val">${k === 'p' && v === 0 ? 'Off' : Math.round(v * 100) + '%'}</span>`);
+      ws.appendChild(r);
+      bindSlider($('.slider', r), (nv) => {
+        const w = Object.assign({}, SCS.weights); w[k] = Math.round(nv * 0.5 * 100) / 100;
+        $('.val', r).textContent = k === 'p' && w[k] === 0 ? 'Off' : Math.round(w[k] * 100) + '%';
+        SCR.setStyle('My Own', w);
+      });
+    });
+    $('#comp-style-name').textContent = SCS.style;
+  }
   function setStyle(name) {
+    if (realScores()) { SCR.setStyle(name); toast(`Style: ${name}. Scores re-weighed.`); return; }
     S.style = name; S.weights = Object.assign({}, D.styles[name]);
     $('#comp-style-name').textContent = name;
     renderReview(); renderComp(); renderFooter();
@@ -792,6 +939,21 @@
     const found = SS.lines.filter((l) => l.takes > 0).length;
     return [`${found} of ${n} lines lined up with your takes`, [`${SS.sections.length} section${SS.sections.length === 1 ? '' : 's'}`, `Lined up on ${SS.linedUp} take${SS.linedUp === 1 ? '' : 's'}`, 'Saved with your project']];
   }
+  function scoresMessage(page) {
+    const n = SS.lines.length;
+    const scored = SS.lines.filter((l, i) => SCR.takesOf(i).length).length;
+    const takes = new Set(); Object.values(SCS.lines).forEach((l) => l.forEach((sc) => takes.add(sc.id)));
+    if (!n) return ['Add your lyrics: every line of every take gets a score', ['Lyrics page: paste or open them', 'Then record a few takes', `Style: ${SCS.style}`]];
+    if (!scored) return [SS.listening.now ? `Listening to ${SS.listening.now}\u2026` : (TS.list.length ? 'Scoring your takes\u2026' : 'Record a few takes of this part to score them'), ['Pitch \u00B7 Timing \u00B7 Clarity \u00B7 Energy', 'Worked out on your computer', `Style: ${SCS.style}`]];
+    if (page === 'review') {
+      const a = SCR.agreement();
+      let sum = 0, cnt = 0, flagged = 0;
+      SS.lines.forEach((l, i) => { const id = SCR.chosen(i), sc = id && SCR.scoreOf(i, id); if (!sc) return; const t = SCR.total(sc); sum += t; cnt++; if ((sc.problems || []).length || t < 75) flagged++; });
+      const title = a.picked ? `Your pick matches Comp Captain\u2019s on ${a.same} of ${a.picked} line${a.picked === 1 ? '' : 's'}` : `Average score ${Math.round(sum / Math.max(1, cnt))}%${flagged ? ` \u00B7 ${flagged} line${flagged === 1 ? '' : 's'} to check` : ''}`;
+      return [title, [`Style: ${SCS.style}`, 'Hearts win ties', 'Click a line to comp it']];
+    }
+    return [`${scored} of ${n} lines scored across ${takes.size} take${takes.size === 1 ? '' : 's'}`, ['Click a take to pick it for the line', '\u2191 \u2193 step through the takes', `Style: ${SCS.style}`]];
+  }
   function renderFooter() {
     const p = S.page;
     const ov = Math.round(D.lines.reduce((a, l, i) => a + total(D.scores[i][S.choice[i]], S.weights), 0) / D.lines.length);
@@ -799,9 +961,9 @@
     const msgs = {
       record: real() ? T.status() : [S.armed ? (S.playing ? `Recording Take ${D.takes.length + 1}` : `Armed: press Record in your DAW`) : 'Lyrics locked to the beat', ['Count-in on screen', 'Every pass becomes a take', 'Bar-stamped']],
       lyrics: lyricsMessage(),
-      comp: [`Comp complete! Best of ${D.takes.length} takes, line by line.`, ['Strongest pitch & timing', 'Consistent tone', 'High energy', 'Joins in the breaths']],
+      comp: realScores() ? scoresMessage('comp') : [`Comp complete! Best of ${D.takes.length} takes, line by line.`, ['Strongest pitch & timing', 'Consistent tone', 'High energy', 'Joins in the breaths']],
       tighten: ['Layers are tight and in time with the lead.', ['Doubles within 12 ms', 'Ad-libs left natural', 'BV lined up', 'Guitars on the grid']],
-      review: [`Average score ${ov}%${flagged ? ` \u00B7 ${flagged} line${flagged > 1 ? 's' : ''} to check` : ''}`, [`Style: ${S.style}`, 'Hearts win ties', 'Click a line to comp it']],
+      review: realScores() ? scoresMessage('review') : [`Average score ${ov}%${flagged ? ` \u00B7 ${flagged} line${flagged > 1 ? 's' : ''} to check` : ''}`, [`Style: ${S.style}`, 'Hearts win ties', 'Click a line to comp it']],
       export: [`Ready: ${Object.values(S.exportOn).filter(Boolean).length || 6} files, all from bar 1.1`, ['Named by role', 'Works in any DAW', 'Nothing sent online']],
     }[p];
     $('#msg-title').textContent = msgs[0];
@@ -825,7 +987,7 @@
     } else {
       const opts = {
         lyrics: ['Tips', 'i-bulb', ['Put [Verse 1] above a part to make a section', 'Type [Chorus] again to sing it again', 'No lyrics? Hear It writes them for you']],
-        comp: ['Comp Builder', 'i-target', ['Build from the highest-scoring takes', 'Keep the strongest feel & performance', 'Blend joins in the breaths (no clicks)']],
+        comp: realScores() ? ['Picking takes', 'i-target', ['Click a take to pick it for this line', 'Click your pick again: Comp Captain chooses', 'AUTO COMP: the best take for every line']] : ['Comp Builder', 'i-target', ['Build from the highest-scoring takes', 'Keep the strongest feel & performance', 'Blend joins in the breaths (no clicks)']],
         tighten: ['Suggestions (Optional)', 'i-bulb', ['Tighten doubles (\u221212 ms)', 'Match backing vocal level (+1.5 dB)', 'Line up Guitar Layer 2 with the grid']],
         review: ['What the scores mean', 'i-bulb', ['Pitch: on the notes \u00B7 Timing: on the beat', 'Clarity: words clear \u00B7 Energy: delivery', '\u26A0 a pop, clip or loud breath was heard']],
         export: ['Each file carries its role', 'i-bulb', ['Lead, Double, Ad-lib, Backing, Guitar', 'Voxology reads the role automatically', 'Plain WAV: opens in any DAW']],
@@ -839,6 +1001,8 @@
     if (go) $('#go-label').innerHTML = go;
   }
   function goAction() {
+    if (S.page === 'comp' && realScores()) return toast('Building the finished comp (one performance from your picks) arrives in M4. Your picks are saved with the project.', 5000);
+    if (S.page === 'review' && realScores()) return toast('Scores are worked out again by themselves whenever your takes or lyrics change.', 4000);
     if (S.page === 'comp') { setChoice(autoComp(), 'Best performance built from the highest-scoring lines.'); return; }
     if (S.page === 'lyrics' && Bridge.inHost) {
       const L = SS.listening;
@@ -851,6 +1015,15 @@
     }
     const m = { lyrics: ['Lining up lyrics', 'M2'], tighten: ['Tightening and rendering', 'M5'], review: ['Scoring real takes', 'M3'], export: ['Rendering', 'M4'] }[S.page];
     if (m) soon(m[0], m[1]);
+  }
+
+  // Swap Take / the arrow keys: the next take of the current line, best first.
+  function stepPick(d) {
+    const li = S.sl, list = SCR.takesOf(li).slice().sort((a, b) => SCR.total(b) - SCR.total(a));
+    if (!list.length) return toast('No scored takes on this line yet.');
+    const at = list.findIndex((sc) => sc.id === SCR.chosen(li));
+    const next = list[(at + d + list.length) % list.length];
+    pickTake(li, next.id);
   }
 
   // ------------------------------------------------------------------ playback (demo: moves the playheads only)
@@ -1001,16 +1174,26 @@
       if (real()) return T.trackMenu(e.currentTarget);
       menu(e.currentTarget, ['Vocal \u2013 Lead', 'Vocal \u2013 Double L', 'Vocal \u2013 Double R', 'Vocal \u2013 Ad-Libs', 'BV \u2013 Stack', 'Guitar \u2013 Rhythm'], (it) => { $('#track-name').textContent = it; $('#track-name').dataset.custom = it; toast('In the plug-in, every track with Comp Captain on it shows here.'); });
     };
-    $('#comp-style').onclick = (e) => menu(e.currentTarget, Object.keys(D.styles), setStyle);
+    $('#comp-style').onclick = (e) => menu(e.currentTarget, realScores() ? SCR.STYLES.map((x) => ({ label: x[0], value: x[0], checked: x[0] === SCS.style })) : Object.keys(D.styles), (it) => setStyle(typeof it === 'string' ? it : it.value));
     $$('#view-seg button').forEach((b) => { b.onclick = () => setCompView(b.dataset.view, true); });
-    $('#auto-comp').onclick = () => setChoice(autoComp(), 'Auto Comp picked the best take for every line.');
+    $('#auto-comp').onclick = () => {
+      if (realScores()) { S.pickUndo.push(SCR.snapshot()); S.pickRedo = []; SCR.clearPicks(); toast('Auto Comp: Comp Captain picks the best take for every line.'); return; }
+      setChoice(autoComp(), 'Auto Comp picked the best take for every line.');
+    };
     $('#swap-take').onclick = () => {
+      if (realScores()) { stepPick(1); return; }
       const li = S.line, order = D.scores[li].map((s, i) => [total(s, S.weights), i]).sort((a, b) => b[0] - a[0]).map((x) => x[1]);
       const next = order[(order.indexOf(S.choice[li]) + 1) % order.length];
       const n = S.choice.slice(); n[li] = next; setChoice(n, `Line ${li + 1}: now using ${D.takes[next].name}`);
     };
-    $('#undo').onclick = () => { if (!S.undo.length) return toast('Nothing to undo'); S.redo.push(S.choice); S.choice = S.undo.pop(); renderComp(); renderReview(); renderFooter(); };
-    $('#redo').onclick = () => { if (!S.redo.length) return toast('Nothing to redo'); S.undo.push(S.choice); S.choice = S.redo.pop(); renderComp(); renderReview(); renderFooter(); };
+    $('#undo').onclick = () => {
+      if (realScores()) { if (!S.pickUndo.length) return toast('Nothing to undo'); S.pickRedo.push(SCR.snapshot()); SCR.setPicks(S.pickUndo.pop()); return; }
+      if (!S.undo.length) return toast('Nothing to undo'); S.redo.push(S.choice); S.choice = S.undo.pop(); renderComp(); renderReview(); renderFooter();
+    };
+    $('#redo').onclick = () => {
+      if (realScores()) { if (!S.pickRedo.length) return toast('Nothing to redo'); S.pickUndo.push(SCR.snapshot()); SCR.setPicks(S.pickRedo.pop()); return; }
+      if (!S.redo.length) return toast('Nothing to redo'); S.undo.push(S.choice); S.choice = S.redo.pop(); renderComp(); renderReview(); renderFooter();
+    };
     $('#go-btn').onclick = goAction;
     // record page
     $('#r-arm').onclick = () => {
@@ -1106,8 +1289,10 @@
       if (e.target.tagName === 'TEXTAREA') return;
       if (e.key === 'Escape') { $$('.overlay').forEach((o) => { o.hidden = true; }); closeMenu(); }
       if (S.page !== 'comp') return;
-      if (e.key === 'ArrowLeft') { setLine(S.line - 1, true); e.preventDefault(); }
-      if (e.key === 'ArrowRight') { setLine(S.line + 1, true); e.preventDefault(); }
+      if (e.key === 'ArrowLeft') { setLine((realScores() ? S.sl : S.line) - 1, true); e.preventDefault(); }
+      if (e.key === 'ArrowRight') { setLine((realScores() ? S.sl : S.line) + 1, true); e.preventDefault(); }
+      if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && realScores()) { stepPick(e.key === 'ArrowUp' ? -1 : 1); e.preventDefault(); return; }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { if (realScores()) e.preventDefault(); }
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         const n = S.choice.slice(), d = e.key === 'ArrowUp' ? -1 : 1;
         n[S.line] = (n[S.line] + d + D.takes.length) % D.takes.length; setChoice(n); e.preventDefault();
@@ -1162,6 +1347,19 @@
       showLyricsText(false);
       renderLyricBar(); renderLyricsList(); renderRecord(); renderFooter();
       startFollowing();
+    });
+  });
+
+  // ------------------------------------------------------------------ scores from the plug-in (scores.js)
+  let scoresQueued = false;
+  SCR.onChange(() => {
+    if (scoresQueued) return; scoresQueued = true;
+    requestAnimationFrame(() => {
+      scoresQueued = false;
+      $('#comp-style-name').textContent = SCS.style;
+      if (S.page === 'comp') renderComp();
+      if (S.page === 'review') renderReview();
+      renderFooter();
     });
   });
 

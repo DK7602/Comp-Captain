@@ -7,11 +7,11 @@ const Manual = `
 <p>You sing a part five or ten times. Comp Captain listens to every take, scores every line, and builds one great
 performance from the best lines. You approve every pick. Then it lines up your doubles, ad-libs, backing vocals and
 doubled guitars so they sit tight with the lead, and hands the finished parts back to your DAW.</p>
-<p><b>This version (M2) brings your takes and your lyrics in.</b> Record takes with CAPTURE, add audio files, or let
+<p><b>This version (M3) brings your takes and lyrics in, and scores every line of every take.</b> Record takes with CAPTURE, add audio files, or let
 Cubase hand over the takes on a track's lanes. Every take lands on the bar it belongs to. Give Comp Captain your
 lyrics and it listens to each take and works out where every line is sung, so the teleprompter follows your song.
-Scores and comping come in the next versions: until then those parts show a sample song, marked with a gold
-<span class="soon">SAMPLE</span> tag. On its track, Comp Captain passes your audio through untouched.</p>
+Building the finished comp, tightening and exporting come in the next versions: until then those parts show a
+sample song, marked with a gold <span class="soon">SAMPLE</span> tag. On its track, Comp Captain passes your audio through untouched.</p>
 
 <h2>Recording takes (CAPTURE)</h2>
 <ol>
@@ -80,10 +80,10 @@ opens it in its own window, which you can make bigger.</p>
 <ul>
 <li><b>Record</b>: CAPTURE, your takes, and the teleprompter with your lyrics.</li>
 <li><b>Lyrics</b>: get the words in; Comp Captain lines each line up with your takes.</li>
-<li><b>Comp</b>: every take of every line with its scores; the Song view already shows your real takes.
-<span class="soon">M3&#x2013;M4</span></li>
+<li><b>Comp</b>: every take of every line with its scores, your picks, and the Song view of all your takes.
+Building the finished comp: <span class="soon">M4</span></li>
 <li><b>Tighten</b>: line up doubles, ad-libs, backing vocals and guitars with the lead. <span class="soon">M5</span></li>
-<li><b>Review</b>: scores for the whole song, and the Style that decides what matters most. <span class="soon">M3</span></li>
+<li><b>Review</b>: scores for the whole song, the lines to check, and the Style that decides what matters most.</li>
 <li><b>Export</b>: make the finished audio files, or drag them straight into your DAW. <span class="soon">M4</span></li>
 </ul>
 
@@ -144,16 +144,43 @@ round).</p>
 <p>Words not following? Open <b>&#x2699; Settings</b> and click <b>Copy</b> next to <b>Lyrics &amp; listening</b>: it
 copies a plain report of what Comp Captain heard in your takes and where each line landed. Paste it into the chat.</p>
 
-<h2>The scores (M3)</h2>
+<h2>The scores</h2>
+<p>Once your takes have been listened to (and your lyrics are in), every line of every take on the track gets four
+scores from 0 to 100, worked out on your computer in the background:</p>
 <ul>
-<li><b>Pitch</b>: on the notes. Off for rap.</li>
-<li><b>Timing</b>: on the beat, and with your other takes.</li>
-<li><b>Clarity</b>: the words came through clearly and correctly.</li>
-<li><b>Energy</b>: the delivery, compared with your other takes of the same line.</li>
-<li><b>&#x26A0;</b>: a problem in the recording, like a pop, clipping or a loud breath. It says what it heard.</li>
+<li><b>Pitch</b>: on the notes, against the melody your other takes agree on (and the semitones, with only one take).
+It names a word that's sharp or flat, and by how much.</li>
+<li><b>Timing</b>: lined up with your other takes of the line, and on the beat. It says if a line is a little behind
+or rushed, and by how many milliseconds.</li>
+<li><b>Clarity</b>: every word heard clearly. It names a word that didn't come through.</li>
+<li><b>Energy</b>: the delivery (how loud and bright) against your other takes of the same line.</li>
+<li><b>&#x26A0;</b>: a problem in the recording: clipping (too loud for the input), a pop (a burst of air on the mic),
+a loud breath right before the line, or more background noise than your other takes. Each one lowers the total a
+little, and hovering over the &#x26A0; says what it heard.</li>
 </ul>
-<p>The <b>Style</b> (Rap, Pop, Country, Worship / Gospel...) decides how much each score counts. The scores advise;
-you decide. A take you mark with a heart wins ties.</p>
+<p>The scores compare a take with your <b>other takes on the same track</b>, so the more takes you record of a part,
+the better they get (five is a good start). A track's takes are never compared with a harmony on another track.</p>
+
+<h2>Picking takes (Comp page)</h2>
+<ul>
+<li>The <b>Line</b> view shows every take of the current line with its scores and total. The ticked one is the take
+in your comp: Comp Captain's best, or your own pick.</li>
+<li><b>Click a take</b> to pick it for that line (a small dot by its name shows it's yours). Click your pick again
+to let Comp Captain choose. <b>&#x2191; &#x2193;</b> (or Swap Take) step through the takes, best first;
+<b>&#x2190; &#x2192;</b> move between lines. Undo and Redo work on your picks.</li>
+<li><b>Line Scores</b> (right) shows the ticked take's scores and why: what's good, what could be better, and any
+&#x26A0; problem.</li>
+<li><b>AUTO COMP</b> clears your picks: Comp Captain's best take on every line.</li>
+<li>The <b>Best Comp</b> lane shows which take each line uses, along the song. Hearing it and making it into one
+finished performance comes next (M4).</li>
+</ul>
+
+<h2>Review and Style</h2>
+<p>The <b>Review</b> page lists every line with the take it uses and its scores. Lines with a &#x26A0; or a total
+under 75% are highlighted: click one to go and fix it. The <b>Style</b> (right) decides how much each score counts:
+Rap and Trap lean on Timing, Clarity and Energy (Rap doesn't count Pitch at all); singing styles lean on Pitch. Move
+a slider to make your own. When you've made picks, the Assistant says how often yours match Comp Captain's: tell us
+that number when you test it. The scores advise; you decide. A take you mark with a heart wins ties.</p>
 
 <h2>Works on its own, even better with Sonicology</h2>
 <p>Export works the same for everyone: clearly named WAV files that land on the right bar in any DAW. If Voxology

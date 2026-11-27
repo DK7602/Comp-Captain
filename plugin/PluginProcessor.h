@@ -207,6 +207,7 @@ public:
     std::map<int, Pick> picks() const;
     void setPick (int line, std::uint32_t take, const std::string& lineText); // take 0 = no pick (Comp Captain's)
     void clearPicks();
+    void setPicks (std::map<int, Pick>);                                       // all at once (undo / redo)
 
 private:
     void timerCallback() override;

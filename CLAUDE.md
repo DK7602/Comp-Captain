@@ -4,7 +4,7 @@ Comp Captain is a planned JUCE 8 plug-in and standalone app (VST3, Standalone, A
 line of every vocal take, builds the best comp from them, and tightens doubles, stacks, ad-libs, backing vocals and
 doubled guitars to the lead. **The plan is `docs/PLAN.md`: read it first.**
 
-## Status (2026-11-27): M2 done (0.3.5), tested in Cubase by the owner: takes save (track monitor on), lyrics follow the singing after a take is listened to, beat scroll before the first take. Next: M3 (scores) on the owner's go; needs 5+ takes of one part from the owner.
+## Status (2026-11-27): M3 (scores) built, 0.4.0, waiting for the owner's Cubase test (owner recorded 5 takes, not shared with us: scores were tuned on the owner's Don vocal with altered copies)
 
 - **M0 (the look)** done, 0.1.1, tested in Cubase by the owner (loads clean; sharper waveforms, bigger lyric text,
   navy Assistant badge backing).
@@ -18,6 +18,11 @@ doubled guitars to the lead. **The plan is `docs/PLAN.md`: read it first.**
   teleprompter following the DAW with count-in, Hear It, From My Songs (Song Rider Pro's exported page; Song
   Savant / Key Compass hold no lyrics). Details in `docs/PLAN.md`
   (M2 status). `cc_listen <model> <take.wav> [lyrics.txt]` tries listening + lining up on a real take.
+- **M3 (scores)** built, 0.4.0: per take features (Take N.feat: pitch, loudness, 20-60 Hz pop band, brightness,
+  flat-top clipping), scores per line per take (Pitch vs the nearest half of the other takes, Timing by lining the
+  takes' sound up in song time, Clarity from what was heard, Energy vs the other takes; problems: clipping, pops,
+  loud breath, noise), plain reasons, Styles, the owner's picks per line (saved), Review with "your pick matches on
+  N of M lines". Details in `docs/PLAN.md` (M3 status). `cc_score` tries it on real takes.
 - The owner cares most about **big lyrics on the Record page** (the teleprompter).
 - Decisions are in `docs/PLAN.md`, "Decisions after the art". Interface: **web view** (`ui/`), packed into the
   plug-in. Keep the title, logo, glows and backgrounds exactly as the owner's art (`art/`); layout is ours.

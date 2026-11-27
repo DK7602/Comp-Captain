@@ -313,6 +313,34 @@ Pass: on the owner's real takes, lines land within a word of where they belong.
 The five scores, the Styles, the reasons. Pass: on the owner's sessions, Comp Captain's top pick matches the
 owner's own pick on most lines (we count it), and every "bad line" it flags really has the problem it names.
 
+**M3 status (0.4.0, 2026-11-27): built, waiting for the owner's Cubase test.** The owner recorded 5 takes but they
+weren't shared with us (no computer folder linked; they could be uploaded to the Voxology repo's test-audio), so the
+scores were tuned on the owner's Don Birthday vocal with altered copies (untouched x2, 45 cents sharp, 200 ms late,
+quieter with noise, clipped): each caught with the right reason, the untouched takes on top. What's in it:
+- **Features** (engine `Features`, `Take N.feat`, made while listening; measured without speech for takes heard by
+  older versions): every 10 ms the note (YIN on 16 kHz, 65-1100 Hz, lone octave slips fixed), how clearly it's a note,
+  loudness, a 20-60 Hz pop band (two 60 Hz low-passes and a 20 Hz high-pass: the owner's vocal is full of sub-20 Hz
+  rumble, and a deep voice's notes sit above 60 Hz), brightness above 2 kHz, peak, and clipping as the wave stuck flat
+  (3+ equal samples at |x| >= 0.25, at whatever level it was cut: a hot file over 1.0 isn't clipped).
+- **Scores** (engine `Scores`), per line per take, 0-100: Pitch = trimmed-RMS (worst 10% out) of the time-warped cent
+  difference to each other take, averaged over the nearest half of them (0.75) + distance from the semitones in the
+  singer's own tuning (0.25), mapped 100 - (off - 8); names the worst word (median, 35-250 cents). Timing = each pair
+  of takes lined up by DTW (+-0.5 s band) on level / rise / tilt in song time around the line; a take's offset is the
+  middle of its signed offsets (early and late takes cancel) + half its unevenness; 0.75 of that + 0.25 syllable
+  starts vs the sixteenths (DAW tempo); 100 - (off - 20)/3; "behind / rushed by N ms" over 60 ms. Clarity = 0.7 x the
+  share of lyric words heard + 0.3 x speech confidence; names missed words. Energy = loudness/4 dB + brightness/3 dB
+  against the other takes' middle, 85 + 15 tanh(0.8 z). Problems: clipping, a pop (20-60 Hz burst +18 dB, most of the
+  sound, unvoiced, loud, at most 80 ms), a loud breath in the 0.7 s before the line, background noise 8 dB over the
+  other takes' (quietest tenth). Total = weighted (scores present), less 3 per problem (8 at most); best = highest,
+  favourite wins within half a point. Styles as the art (Rap pitch 0 ... My Own).
+- **Plug-in**: each copy scores its own track's takes on the background files thread when the song version changes;
+  style + weights and the owner's picks (line, take, the line's words) saved with the project.
+- **Interface**: Comp Line view (every take of the line, scores, warning, total; click to pick, click again to let
+  Comp Captain choose, arrows step), Line Scores with reasons, Best Comp lane tags along the song, Review table with
+  flagged lines, Style grid and weights, "your pick matches on N of M lines", Auto Comp, undo / redo of picks.
+- Not yet: hearing a take or the comp from the plug-in, and making the comp audio (M4). Pitch against the song's key
+  (we use the semitones in the singer's tuning). The take rows' waveforms use the song-level line span.
+
 ### M4 - Comp
 Auto Comp, the comp view, auditioning, swapping, joins and crossfades, level match, undo, saving with the project,
 drag to DAW. Pass: a comped verse with no clicks or jumps at the joins.
