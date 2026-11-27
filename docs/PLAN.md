@@ -294,6 +294,8 @@ Pass: on the owner's real takes, lines land within a word of where they belong.
   press Record", so the reason was easy to miss. Now: while a take records and nothing has come through for 2 s, the
   take list and the Assistant say so (monitor button, Comp Captain on the recorded track); the reason a pass wasn't
   kept stays in the take list until a take is saved. Manual: Cubase's Direct Monitoring bypasses the track's inserts.
+- Owner, 2026-11-27: the track's monitor button was off; turned on, takes save. (Likely also why the first take's
+  words never matched: whatever came through the track wasn't the live singing. Not confirmed.)
 - Not yet: ARA takes aren't listened to yet (their audio comes through the ARA reader: later);
   dragging a line's ends by hand (M3/M4, with comping).
 
