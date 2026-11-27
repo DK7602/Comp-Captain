@@ -10,7 +10,9 @@ doubled guitars to the lead. **The plan is `docs/PLAN.md`: read it first.**
   navy Assistant badge backing).
 - **M1 (takes in)** built, version 0.2.0: CAPTURE, file drop, take list with roles and hearts, takes on the song's
   bars, track picker across copies, ARA Extension with a copyable report. Details in `docs/PLAN.md` (M1 status).
-  The owner tested it in Cubase: CAPTURE works. ARA report from Cubase Artist still to come (not blocking).
+  The owner tested it in Cubase: CAPTURE works (needs the track's monitor button on). **ARA works in Cubase Artist
+  14** (report 2026-11-27: one lane take shared, readable, placed on its bar via the tempo map); ARA takes aren't
+  listened to for lyrics yet (offered to the owner).
 - **M2 (lines and lyrics)** done, 0.3.0-0.3.5, owner-tested ("the lyrics followed along, it worked"): lyrics (paste / .txt / .lrc / .docx, shared by every copy, saved
   with the project), background listening with whisper.cpp (model inside each bundle), lines lined up across takes,
   teleprompter following the DAW with count-in, Hear It, From My Songs (Song Rider Pro's exported page; Song

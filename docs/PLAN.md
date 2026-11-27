@@ -190,8 +190,13 @@ loads clean; their fixes (sharper waveforms, bigger lyrics, Assistant badge back
 ### M1 - Takes in
 CAPTURE, file drop and the ARA proof. Take list, roles, waveforms placed on the song's bars.
 Pass: record 5 takes in Cubase, they all show at the right bar; ARA sees the lane takes (or we learn its limits).
-**Status (2026-11-23):** done, 0.2.1. The owner tested it in Cubase: arming CAPTURE and recording works. (The ARA
-report from Cubase Artist is still to come; it doesn't block M2.) What's in it:
+**Status (2026-11-23):** done, 0.2.1. The owner tested it in Cubase: arming CAPTURE and recording works.
+**ARA in Cubase Artist 14: works** (owner's report, 2026-11-27, on 0.3.4). With one lane event selected, Audio >
+Extensions > Comp Captain shared: 1 region sequence (track "Comp Captain test"), 1 audio source (48 kHz mono,
+readable), 1 playback region ("Take 6" at bar 2.3 = 3.000 s, 0:09), and the song's tempo map (2 tempo points, 1 time
+signature). The copy that wrote the report had the editor view + editor renderer roles, not the playback renderer
+(another copy plays). Only the selected events are shared: select every lane take before choosing the Extension.
+Open: does the take play back unchanged (asked); several takes at once not tried yet. What's in it:
 - **CAPTURE** (engine `Capture`): armed by the red button (a non-automatable "CAPTURE armed" parameter, never armed
   when a project opens). While armed and the DAW records, the audio thread copies the track's sound into a lock-free
   ring; a shared background thread writes 32-bit float WAVs (header kept current, so a crash keeps the take) to
@@ -325,5 +330,6 @@ Role tags for Voxology and Mixology, Word swap, the video tutorial, the DAW guid
   only and never go in the repo. Already reachable: the owner's single-take vocals in the Voxology repository
   (`test-audio/`, e.g. Don_Birthday_2024_Vox_only.mp3, the Gallas / Schaf / Don & Lysette acapellas), fine for M1/M2;
   M3 still needs several takes of the same part.
-- **From the M1 Cubase test**: the ARA report (Settings > ARA > Copy) with takes on lanes selected.
+- ~~From the M1 Cubase test: the ARA report~~ received 2026-11-27 (ARA works in Cubase Artist 14; see M1 status).
+  Still worth a second one with several lane takes selected at once.
 - Confirm the Styles list and the default score weights for each.
