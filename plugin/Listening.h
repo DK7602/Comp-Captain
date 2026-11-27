@@ -2,6 +2,7 @@
 
 #include <juce_core/juce_core.h>
 
+#include "cc/Features.h"
 #include "cc/Words.h"
 
 #include <atomic>
@@ -13,8 +14,8 @@
 
 // Background listening: one thread for the whole DAW session works through every track's takes, one take
 // at a time, reading each take's file, finding its phrases and hearing its words (speech recognition on
-// this computer; nothing is sent anywhere). What it hears is kept next to the take ("Take 3.words") so a
-// take is only listened to once. It never touches the audio thread, uses at most half the computer's cores
+// this computer; nothing is sent anywhere), and measuring what it sounds like every 10 ms for the scores.
+// Both are kept next to the take ("Take 3.words", "Take 3.feat") so a take is only listened to once. It never touches the audio thread, uses at most half the computer's cores
 // (four at most), and waits while any Comp Captain is recording a take.
 class Listening final : private juce::Thread
 {
@@ -28,6 +29,7 @@ public:
         std::filesystem::path file;  // the take's file (a take reloaded with the project may have a new one)
         bool ok = false;
         cc::Hearing hearing;
+        std::shared_ptr<const cc::TakeFeatures> features; // what it sounds like every 10 ms (for the scores)
         juce::String message; // why it didn't work, in plain words
     };
 

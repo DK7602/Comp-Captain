@@ -5,6 +5,7 @@
 //  - peak: the loudest sample; clipped: samples squashed flat at full scale (real clipping, not just a loud peak)
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <filesystem>
 #include <optional>
@@ -39,6 +40,20 @@ namespace cc
     // peaks / clipped: per 10 ms at the take's own rate, the loudest sample of any channel and how many samples were
     // stuck at full scale (clipping can hide in one channel of a stereo take); may be empty.
     TakeFeatures analyseTake (const std::vector<float>& mono16k, const std::vector<float>& peaks, const std::vector<float>& clipped = {});
+
+    // A take read from its WAV file for listening and measuring: in mono at its own rate, and per 10 ms the loudest
+    // sample of any channel and how many samples were stuck flat (clipping). Empty optional if it can't be read or was
+    // stopped (cancel).
+    struct TakeAudio
+    {
+        std::vector<float> mono;
+        double sampleRate = 0.0;
+        std::vector<float> peaks, clipped;
+    };
+    std::optional<TakeAudio> readTake (const std::filesystem::path& wav, const std::atomic<bool>* cancel, std::string& error);
+
+    // What a take sounds like, read straight from its file (when it was listened to before, but not measured).
+    std::optional<TakeFeatures> measureTake (const std::filesystem::path& wav, const std::atomic<bool>* cancel, std::string& error);
 
     // The note in Hz in one stretch of 16 kHz audio (YIN), 0 if it isn't a clear note. periodic gets 0..1.
     float findPitch (const float* audio16k, size_t length, float& periodic);

@@ -1,5 +1,8 @@
 #include "cc/Features.h"
 
+#include "cc/Resample.h"
+#include "cc/WavFile.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -267,5 +270,74 @@ namespace cc
                 return std::nullopt;
         }
         return f;
+    }
+
+    std::optional<TakeAudio> readTake (const std::filesystem::path& wav, const std::atomic<bool>* cancel, std::string& error)
+    {
+        WavReader reader;
+        if (! reader.open (wav))
+        {
+            error = "The take's file couldn't be read: " + utf8FromPath (wav);
+            return std::nullopt;
+        }
+        // in mono, a block at a time (a long stereo take never sits in memory twice)
+        const auto& info = reader.info();
+        const int channels = std::max (1, std::min (2, info.channels));
+        std::vector<std::vector<float>> block ((size_t) channels, std::vector<float> (65536));
+        std::vector<float*> ptrs;
+        for (auto& c : block)
+            ptrs.push_back (c.data());
+        TakeAudio a;
+        a.sampleRate = info.sampleRate;
+        if (info.lengthFrames > 0)
+            a.mono.reserve ((size_t) info.lengthFrames);
+        const auto frameSamples = (size_t) std::max (1.0, std::round (info.sampleRate * TakeFeatures::hop));
+        size_t sampleIndex = 0;
+        std::vector<int> flatRun ((size_t) channels, 0);
+        std::vector<float> previous ((size_t) channels, 0.0f);
+        int got = 0;
+        while ((got = reader.read (ptrs.data(), channels, 65536)) > 0)
+        {
+            if (cancel != nullptr && cancel->load())
+                return std::nullopt;
+            for (int i = 0; i < got; ++i, ++sampleIndex)
+            {
+                float v = 0.0f, pk = 0.0f;
+                bool flat = false;
+                for (int c = 0; c < channels; ++c)
+                {
+                    const float x = block[(size_t) c][(size_t) i];
+                    v += x;
+                    pk = std::max (pk, std::abs (x));
+                    // clipping: the wave stuck flat (3 or more equal samples in a row) at a loud level, at whatever
+                    // level it was cut (the DAW's gain may sit between the input and Comp Captain)
+                    auto& run = flatRun[(size_t) c];
+                    run = std::abs (x) >= 0.25f && x == previous[(size_t) c] ? run + 1 : 0;
+                    previous[(size_t) c] = x;
+                    flat = flat || run >= 2;
+                }
+                a.mono.push_back (v / (float) channels);
+                const size_t frame = sampleIndex / frameSamples;
+                if (frame >= a.peaks.size())
+                {
+                    a.peaks.push_back (0.0f);
+                    a.clipped.push_back (0.0f);
+                }
+                a.peaks[frame] = std::max (a.peaks[frame], pk);
+                a.clipped[frame] += flat ? 1.0f : 0.0f;
+            }
+        }
+        return a;
+    }
+
+    std::optional<TakeFeatures> measureTake (const std::filesystem::path& wav, const std::atomic<bool>* cancel, std::string& error)
+    {
+        auto a = readTake (wav, cancel, error);
+        if (! a)
+            return std::nullopt;
+        const auto audio = resample (a->mono, a->sampleRate, rate);
+        if (cancel != nullptr && cancel->load())
+            return std::nullopt;
+        return analyseTake (audio, a->peaks, a->clipped);
     }
 }

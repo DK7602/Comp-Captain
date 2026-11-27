@@ -299,6 +299,8 @@ namespace
         check (heard.contains ("model=base.en-q5_1"), "the speech model inside the plug-in was found and used");
         check (heard.containsIgnoreCase ("country") && heard.containsIgnoreCase ("americans"), "it heard the words that were said");
         check (heard.contains ("phrase\t"), "it found the sung phrases");
+        const auto measured = words.withFileExtension (".feat");
+        check (measured.existsAsFile() && measured.getSize() > 1000, "it measured what the take sounds like, for the scores (\"Take 2.feat\")");
 #else
         juce::ignoreUnused (plugin, takesRoot);
         std::cout << "  SKIP  listening (this build has no speech model)" << std::endl;

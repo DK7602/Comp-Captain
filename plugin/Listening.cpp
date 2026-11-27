@@ -160,6 +160,17 @@ void Listening::run()
         {
             r.ok = true;
             r.hearing = std::move (*saved);
+            // measured before too? if not (listened to by an older version), measure it now: no model needed
+            auto measured = job.again ? std::optional<cc::TakeFeatures> {} : cc::loadFeatures (job.file);
+            if (! measured.has_value())
+            {
+                std::string error;
+                measured = cc::measureTake (job.file, &stopCurrent, error);
+                if (measured.has_value())
+                    cc::saveFeatures (job.file, *measured);
+            }
+            if (measured.has_value())
+                r.features = std::make_shared<const cc::TakeFeatures> (std::move (*measured));
         }
         else if (! prepare())
         {
@@ -176,11 +187,17 @@ void Listening::run()
                 state.percent = percent;
             };
             std::string error;
-            if (auto h = cc::hearTake (impl->recognizer, job.file, o, error))
+            cc::TakeFeatures measured;
+            if (auto h = cc::hearTake (impl->recognizer, job.file, o, error, &measured))
             {
                 r.ok = true;
                 r.hearing = std::move (*h);
                 cc::saveHearing (job.file, r.hearing);
+                if (! measured.empty())
+                {
+                    cc::saveFeatures (job.file, measured);
+                    r.features = std::make_shared<const cc::TakeFeatures> (std::move (measured));
+                }
             }
             else
             {

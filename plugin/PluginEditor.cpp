@@ -180,7 +180,7 @@ void CompCaptainEditor::handleUiEvent (const juce::var& message)
         uiReady = true;
         sentTakesVersion = sentAraVersion = sentHearingVersion = 0;
         sentSongVersion = 0;
-        sentTracks = sentTransport = sentCapture = sentListening = {};
+        sentTracks = sentTransport = sentCapture = sentListening = sentScores = {};
         liveSerial = 0;
         liveSent = 0;
         sendInit();
@@ -258,6 +258,33 @@ void CompCaptainEditor::handleUiEvent (const juce::var& message)
     }
     else if (type == "hearIt")
         hearIt (message);
+    else if (type == "pick")
+    {
+        // your own pick for a line ("" = none: Comp Captain's best)
+        const int line = (int) message.getProperty ("line", -1);
+        const auto take = ownId (message.getProperty ("id", {}).toString());
+        const auto text = message.getProperty ("text", {}).toString().toStdString();
+        if (line >= 0)
+            withViewed ([&] (CompCaptainProcessor& p) { p.setPick (line, take.value_or (0), text); });
+        sendScores (true);
+    }
+    else if (type == "picksClear")
+    {
+        withViewed ([] (CompCaptainProcessor& p) { p.clearPicks(); });
+        sendScores (true);
+    }
+    else if (type == "style")
+    {
+        const auto w = message.getProperty ("weights", {});
+        cc::ScoreWeights weights;
+        if (w.isArray() && w.size() == 4)
+            weights = { (double) w[0], (double) w[1], (double) w[2], (double) w[3] };
+        else if (const auto preset = cc::styleWeights (message.getProperty ("name", {}).toString().toStdString()))
+            weights = *preset;
+        const auto name = message.getProperty ("name", "My Own").toString().toStdString();
+        withViewed ([&] (CompCaptainProcessor& p) { p.setStyle (name, weights); });
+        sendScores (true);
+    }
     else if (type == "listenAgain")
     {
         withViewed ([] (CompCaptainProcessor& p) { p.listenAgain(); });
@@ -362,6 +389,7 @@ void CompCaptainEditor::sendInit()
     sendCapture (true);
     sendLyrics (true);
     sendListening (true);
+    sendScores (true);
 }
 
 void CompCaptainEditor::sendTakes()
@@ -619,6 +647,7 @@ void CompCaptainEditor::timerCallback()
     if (version != sentTakesVersion || araVersion != sentAraVersion || hearingVersion != sentHearingVersion)
         sendTakes();
     sendLyrics (false);
+    sendScores (false);
     if (tick % 3 == 0)
         sendListening (false);
     if (tick % 15 == 0)
@@ -776,6 +805,85 @@ void CompCaptainEditor::lyricsFromFile (const juce::String& name, const juce::Me
     }
     send ("lyricsLoaded", msg);
     sendLyrics (false);
+}
+
+// The scores for the viewed track: every line, every take that sang it (four scores and the reasons), your picks,
+// and the style. The window works out the totals and the best take (so moving a style slider is instant).
+void CompCaptainEditor::sendScores (bool force)
+{
+    std::shared_ptr<const CompCaptainProcessor::Scores> scores;
+    std::map<int, CompCaptainProcessor::Pick> picks;
+    std::string style;
+    cc::ScoreWeights weights;
+    juce::uint32 version = 0;
+    bool ready = false;
+    juce::uint64 track = 0;
+    withViewed ([&] (CompCaptainProcessor& p) {
+        version = p.scoresVersion();
+        scores = p.scores();
+        picks = p.picks();
+        style = p.styleName();
+        weights = p.styleWeights();
+        ready = p.scoresReady();
+        track = p.instanceId();
+    });
+    const auto signature = juce::String ((juce::int64) track) + "|" + juce::String ((int) version) + "|" + juce::String ((int) ready);
+    if (! force && signature == sentScores)
+        return;
+    sentScores = signature;
+
+    const auto list = [] (const std::vector<std::string>& v) {
+        juce::Array<juce::var> a;
+        for (auto& s : v)
+            a.add (str (s));
+        return a;
+    };
+    juce::Array<juce::var> lines;
+    if (scores != nullptr)
+    {
+        for (auto& line : scores->lines)
+        {
+            if (line.takes.empty())
+                continue;
+            juce::Array<juce::var> takes;
+            for (auto& s : line.takes)
+            {
+                const auto take = scores->takeOf.find (s.take);
+                if (take == scores->takeOf.end())
+                    continue;
+                auto* o = new juce::DynamicObject();
+                o->setProperty ("id", "t" + juce::String (take->second));
+                o->setProperty ("p", std::round (s.pitch));
+                o->setProperty ("t", std::round (s.timing));
+                o->setProperty ("c", std::round (s.clarity));
+                o->setProperty ("e", std::round (s.energy));
+                o->setProperty ("good", list (s.good));
+                o->setProperty ("bad", list (s.bad));
+                o->setProperty ("problems", list (s.problems));
+                takes.add (juce::var (o));
+            }
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("line", line.line);
+            o->setProperty ("takes", takes);
+            lines.add (juce::var (o));
+        }
+    }
+    auto* pickObj = new juce::DynamicObject();
+    for (auto& [line, pick] : picks)
+    {
+        auto* o = new juce::DynamicObject();
+        o->setProperty ("id", "t" + juce::String (pick.take));
+        o->setProperty ("text", str (pick.lineText));
+        pickObj->setProperty (juce::Identifier (juce::String (line)), juce::var (o));
+    }
+    auto* msg = new juce::DynamicObject();
+    msg->setProperty ("lines", lines);
+    msg->setProperty ("picks", juce::var (pickObj));
+    msg->setProperty ("style", str (style));
+    msg->setProperty ("weights", juce::Array<juce::var> { weights.pitch, weights.timing, weights.clarity, weights.energy });
+    msg->setProperty ("ready", ready);
+    msg->setProperty ("any", scores != nullptr);
+    send ("scores", msg);
 }
 
 // A plain report of the lyrics, the listening and where each line landed, to paste into the chat when the

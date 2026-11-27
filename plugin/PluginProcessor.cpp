@@ -77,6 +77,7 @@ struct CompCaptainProcessor::Mailbox
     std::vector<Imported> imported;
     std::vector<Overview> overviews;
     std::vector<Listening::Result> heard;
+    std::vector<std::shared_ptr<const CompCaptainProcessor::Scores>> scored;
     std::atomic<bool> closed { false };
 };
 
@@ -331,6 +332,11 @@ void CompCaptainProcessor::getStateInformation (juce::MemoryBlock& dest)
         text += std::string ("trackRoleChosen=") + (roleOfTrackChosen ? "1" : "0") + "\n";
         text += std::string ("loopTakes=") + (feed.loopTakes() ? "1" : "0") + "\n";
         text += "seed=" + std::to_string (seed) + "\n";
+        text += "style=" + cc::text::escape (style) + "\n";
+        text += "weights=" + cc::text::formatFixed (weights.pitch, 3) + "," + cc::text::formatFixed (weights.timing, 3) + ","
+                + cc::text::formatFixed (weights.clarity, 3) + "," + cc::text::formatFixed (weights.energy, 3) + "\n";
+        for (auto& [line, pick] : picked)
+            text += "pick=" + std::to_string (line) + " " + std::to_string (pick.take) + " " + cc::text::escape (pick.lineText) + "\n";
         text += lyricsMarker;
         text += "stamp=" + std::to_string (lyricsStamp) + "\n";
         text += "text=" + cc::text::escape (lyrics) + "\n";
@@ -385,6 +391,9 @@ void CompCaptainProcessor::setStateInformation (const void* data, int sizeInByte
     bool loop = true;
     {
         const std::scoped_lock lock (stateLock);
+        style = "Singing";
+        weights = *cc::styleWeights ("Singing");
+        picked.clear();
         uiState = cc::UiState::fromText (uiPart);
         cc::text::forEachKeyValue (trackPart, [&] (std::string_view key, std::string_view value) {
             std::int64_t i = 0;
@@ -398,6 +407,29 @@ void CompCaptainProcessor::setStateInformation (const void* data, int sizeInByte
                 loop = value != "0";
             else if (key == "seed" && cc::text::parseInt (value, i))
                 seed = i;
+            else if (key == "style")
+                style = cc::text::unescape (value);
+            else if (key == "weights")
+            {
+                double w[4] = { 0.25, 0.25, 0.25, 0.25 };
+                std::string_view rest = value;
+                for (int k = 0; k < 4; ++k)
+                {
+                    const auto comma = rest.find (',');
+                    cc::text::parseDouble (rest.substr (0, comma), w[k]);
+                    rest = comma == std::string_view::npos ? std::string_view {} : rest.substr (comma + 1);
+                }
+                weights = { w[0], w[1], w[2], w[3] };
+            }
+            else if (key == "pick")
+            {
+                // "LINE TAKE text of the line"
+                const auto a = value.find (' ');
+                const auto b = a == std::string_view::npos ? a : value.find (' ', a + 1);
+                std::int64_t line = 0, take = 0;
+                if (b != std::string_view::npos && cc::text::parseInt (value.substr (0, a), line) && cc::text::parseInt (value.substr (a + 1, b - a - 1), take) && line >= 0 && take > 0)
+                    picked[(int) line] = { (std::uint32_t) take, cc::text::unescape (value.substr (b + 1)) };
+            }
         });
         takes = cc::TakeList::fromText (takesPart);
         nextTakeNumber.store (std::max (1, takes.nextTakeNumber));
@@ -405,6 +437,8 @@ void CompCaptainProcessor::setStateInformation (const void* data, int sizeInByte
         missing.clear();
         overviewAsked.clear();
         hearings.clear();
+        scored.reset();
+        scoringFor = 0;
         destinationKey.clear();
     }
     feed.setLoopTakes (loop);
@@ -617,14 +651,16 @@ bool CompCaptainProcessor::removeTake (std::uint32_t id)
             const auto dest = bin.getNonexistentChildFile (file.getFileNameWithoutExtension(), file.getFileExtension(), true);
             moved = file.moveFileTo (dest);
             // what was heard in it goes along with it
-            const auto words = file.withFileExtension (".words");
-            if (moved && words.existsAsFile())
-                words.moveFileTo (dest.withFileExtension (".words"));
+            for (const char* ext : { ".words", ".feat" })
+                if (const auto extra = file.withFileExtension (ext); moved && extra.existsAsFile())
+                    extra.moveFileTo (dest.withFileExtension (ext));
         }
         takes.remove (id);
         overviews.erase (id);
         missing.erase (id);
         hearings.erase (id);
+        for (auto it = picked.begin(); it != picked.end();)
+            it = it->second.take == id ? picked.erase (it) : std::next (it);
     }
     heardChanged.fetch_add (1);
     changed();
@@ -812,11 +848,22 @@ void CompCaptainProcessor::collectNews()
     std::vector<Mailbox::Imported> imported;
     std::vector<Mailbox::Overview> pictures;
     std::vector<Listening::Result> heard;
+    std::vector<std::shared_ptr<const Scores>> newScores;
     {
         const std::scoped_lock lock (mailbox->lock);
         imported.swap (mailbox->imported);
         pictures.swap (mailbox->overviews);
         heard.swap (mailbox->heard);
+        newScores.swap (mailbox->scored);
+    }
+    if (! newScores.empty())
+    {
+        {
+            const std::scoped_lock lock (stateLock);
+            scored = newScores.back();
+            scoringFor = 0;
+        }
+        scoresChanged.fetch_add (1);
     }
     if (! heard.empty())
     {
@@ -834,6 +881,7 @@ void CompCaptainProcessor::collectNews()
                 h.done = r.ok;
                 h.failed = ! r.ok;
                 h.hearing = std::move (r.hearing);
+                h.features = std::move (r.features);
             }
             // a problem with speech itself (no model) shows once in the Lyrics page, not per take
             if (! r.ok && r.message.isNotEmpty() && r.message != problem)
@@ -892,6 +940,128 @@ void CompCaptainProcessor::timerCallback()
         wasCapturing = capturing;
     }
     scheduleListening();
+    scheduleScoring();
+}
+
+// ============================================================================ scores
+
+void CompCaptainProcessor::scheduleScoring()
+{
+    // Only once the song's lining up is current, one scoring at a time, and only when something changed.
+    const auto song = CompCaptainProcessor::song();
+    {
+        const std::scoped_lock lock (stateLock);
+        if (scoringFor != 0 || (scored != nullptr && scored->songVersion == song->version))
+            return;
+    }
+    auto job = std::make_shared<Scores>();
+    std::vector<cc::TakeForScoring> takesIn;
+    auto places = std::make_shared<std::deque<std::vector<cc::LinePlace>>>();
+    auto words = std::make_shared<std::deque<std::vector<cc::HeardWord>>>();
+    std::vector<std::shared_ptr<const cc::TakeFeatures>> keepAlive;
+    {
+        const std::scoped_lock lock (stateLock);
+        scoringFor = song->version;
+        job->songVersion = song->version;
+        for (auto& t : takes.all())
+        {
+            const auto h = hearings.find (t.id);
+            if (t.source == cc::TakeSource::ara || ! cc::isSung (t.role) || h == hearings.end() || ! h->second.done || h->second.features == nullptr)
+                continue;
+            const std::uint64_t key = (uniqueId << 32) | t.id;
+            const auto placed = song->lineUp.takes.find (key);
+            if (placed == song->lineUp.takes.end())
+                continue;
+            places->push_back (placed->second);
+            words->push_back (h->second.hearing.words);
+            keepAlive.push_back (h->second.features);
+            cc::TakeForScoring in;
+            in.key = key;
+            in.startSeconds = t.start.seconds;
+            in.startPpq = t.start.ppq;
+            in.bpm = t.start.bpm;
+            in.favourite = t.favourite;
+            in.features = h->second.features.get();
+            in.places = &places->back();
+            in.words = &words->back();
+            takesIn.push_back (in);
+            job->takeOf[key] = t.id;
+        }
+    }
+    // the scoring itself happens on the background thread for files (it takes a moment with many takes)
+    jobs->addJob ([box = mailbox, job, takesIn, places, words, keepAlive, lyrics = song->lyrics]
+    {
+        if (box->closed.load())
+            return;
+        job->lines = cc::scoreLines (lyrics, takesIn);
+        const std::scoped_lock lock (box->lock);
+        box->scored.push_back (job);
+    });
+}
+
+std::shared_ptr<const CompCaptainProcessor::Scores> CompCaptainProcessor::scores() const
+{
+    const std::scoped_lock lock (stateLock);
+    return scored;
+}
+
+bool CompCaptainProcessor::scoresReady() const
+{
+    const auto song = CompCaptainProcessor::song();
+    const std::scoped_lock lock (stateLock);
+    return scored != nullptr && scored->songVersion == song->version;
+}
+
+std::string CompCaptainProcessor::styleName() const
+{
+    const std::scoped_lock lock (stateLock);
+    return style;
+}
+
+cc::ScoreWeights CompCaptainProcessor::styleWeights() const
+{
+    const std::scoped_lock lock (stateLock);
+    return weights;
+}
+
+void CompCaptainProcessor::setStyle (const std::string& name, const cc::ScoreWeights& w)
+{
+    {
+        const std::scoped_lock lock (stateLock);
+        style = name.substr (0, 40);
+        weights = w;
+    }
+    scoresChanged.fetch_add (1);
+    updateHostDisplay (ChangeDetails().withNonParameterStateChanged (true));
+}
+
+std::map<int, CompCaptainProcessor::Pick> CompCaptainProcessor::picks() const
+{
+    const std::scoped_lock lock (stateLock);
+    return picked;
+}
+
+void CompCaptainProcessor::setPick (int line, std::uint32_t take, const std::string& lineText)
+{
+    {
+        const std::scoped_lock lock (stateLock);
+        if (take == 0)
+            picked.erase (line);
+        else
+            picked[line] = { take, lineText };
+    }
+    scoresChanged.fetch_add (1);
+    updateHostDisplay (ChangeDetails().withNonParameterStateChanged (true));
+}
+
+void CompCaptainProcessor::clearPicks()
+{
+    {
+        const std::scoped_lock lock (stateLock);
+        picked.clear();
+    }
+    scoresChanged.fetch_add (1);
+    updateHostDisplay (ChangeDetails().withNonParameterStateChanged (true));
 }
 
 // ============================================================================ listening

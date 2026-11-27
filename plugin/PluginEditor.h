@@ -57,6 +57,7 @@ private:
     void lyricsFromFile (const juce::String& name, const juce::MemoryBlock& bytes);
     void hearIt (const juce::var& message);
     juce::String listeningReport();
+    void sendScores (bool force);
 
     // adding files
     void chooseFiles();
@@ -80,6 +81,7 @@ private:
 
     juce::uint32 sentTakesVersion = 0, sentAraVersion = 0, sentHearingVersion = 0;
     juce::uint64 sentSongVersion = 0;
+    juce::String sentScores;
     juce::String sentListening;
     juce::String sentTracks, sentTransport, sentCapture;
     juce::uint32 liveSerial = 0;

@@ -7,6 +7,7 @@
 #include "Listening.h"
 #include "cc/Capture.h"
 #include "cc/LineUp.h"
+#include "cc/Scores.h"
 #include "cc/PeakMeter.h"
 #include "cc/Take.h"
 #include "cc/UiState.h"
@@ -181,6 +182,32 @@ public:
     juce::uint32 hearingVersion() const noexcept { return heardChanged.load(); }
     void listenAgain(); // forget what was heard in this track's takes and listen to them again
 
+    // ---------------------------------------------------------------- scores (M3)
+    // Every line of this track's takes, scored against each other in the background whenever the lyrics, the takes
+    // or what was heard change. ready: the scores are for the song as it is now (not still being worked out).
+    struct Scores
+    {
+        juce::uint64 songVersion = 0;
+        std::vector<cc::LineScores> lines;
+        std::map<std::uint64_t, std::uint32_t> takeOf; // score key -> take id on this track
+    };
+    std::shared_ptr<const Scores> scores() const;
+    bool scoresReady() const;
+    juce::uint32 scoresVersion() const noexcept { return scoresChanged.load(); }
+
+    // The style (how much each score counts) and your own pick for each line, saved with the project.
+    struct Pick
+    {
+        std::uint32_t take = 0;
+        std::string lineText;  // the line it was picked for (a pick is dropped if the lyrics change under it)
+    };
+    std::string styleName() const;
+    cc::ScoreWeights styleWeights() const;
+    void setStyle (const std::string& name, const cc::ScoreWeights&);
+    std::map<int, Pick> picks() const;
+    void setPick (int line, std::uint32_t take, const std::string& lineText); // take 0 = no pick (Comp Captain's)
+    void clearPicks();
+
 private:
     void timerCallback() override;
     int useTimeSlice() override;
@@ -228,7 +255,15 @@ private:
     {
         bool asked = false, done = false, failed = false, again = false;
         cc::Hearing hearing;
+        std::shared_ptr<const cc::TakeFeatures> features;
     };
+    void scheduleScoring();
+    std::shared_ptr<const Scores> scored;                // under stateLock
+    juce::uint64 scoringFor = 0;                         // the song version being scored (0 = none)
+    std::atomic<juce::uint32> scoresChanged { 1 };
+    std::string style = "Singing";
+    cc::ScoreWeights weights = *cc::styleWeights ("Singing");
+    std::map<int, Pick> picked;
     juce::SharedResourcePointer<Listening> listening;
     std::map<std::uint32_t, TakeHearing> hearings;   // under stateLock
     std::atomic<juce::uint32> heardChanged { 1 };
