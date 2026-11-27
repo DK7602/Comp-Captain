@@ -191,7 +191,7 @@ namespace cc
     }
 
     std::optional<Hearing> hearTake (SpeechRecognizer& sr, const std::filesystem::path& wav,
-                                     const SpeechRecognizer::Options& options, std::string& error)
+                                     const SpeechRecognizer::Options& options, std::string& error, TakeFeatures* features)
     {
         if (! sr.isLoaded())
         {
@@ -214,17 +214,42 @@ namespace cc
         std::vector<float> mono;
         if (info.lengthFrames > 0)
             mono.reserve ((size_t) info.lengthFrames);
+        // the loudest sample of any channel in each 10 ms (clipping can hide in one channel)
+        std::vector<float> peaks, clipped;
+        const auto peakFrame = (size_t) std::max (1.0, std::round (info.sampleRate * TakeFeatures::hop));
+        size_t sampleIndex = 0;
+        std::vector<int> flatRun ((size_t) channels, 0);
+        std::vector<float> previous ((size_t) channels, 0.0f);
         int got = 0;
         while ((got = reader.read (ptrs.data(), channels, 65536)) > 0)
         {
             if (options.cancel != nullptr && options.cancel->load())
                 return std::nullopt;
-            for (int i = 0; i < got; ++i)
+            for (int i = 0; i < got; ++i, ++sampleIndex)
             {
-                float v = 0.0f;
+                float v = 0.0f, pk = 0.0f;
+                bool flat = false;
                 for (int c = 0; c < channels; ++c)
-                    v += block[(size_t) c][(size_t) i];
+                {
+                    const float s = block[(size_t) c][(size_t) i];
+                    v += s;
+                    pk = std::max (pk, std::abs (s));
+                    // clipping: the wave stuck flat (3 or more equal samples in a row) at a loud level, at whatever
+                    // level it was cut (the DAW's gain may sit between the input and Comp Captain)
+                    auto& run = flatRun[(size_t) c];
+                    run = std::abs (s) >= 0.25f && s == previous[(size_t) c] ? run + 1 : 0;
+                    previous[(size_t) c] = s;
+                    flat = flat || run >= 2;
+                }
                 mono.push_back (v / (float) channels);
+                const size_t frame = sampleIndex / peakFrame;
+                if (frame >= peaks.size())
+                {
+                    peaks.push_back (0.0f);
+                    clipped.push_back (0.0f);
+                }
+                peaks[frame] = std::max (peaks[frame], pk);
+                clipped[frame] += flat ? 1.0f : 0.0f;
             }
         }
         Hearing h;
@@ -241,6 +266,8 @@ namespace cc
 
         auto audio = resample (mono, info.sampleRate, SpeechRecognizer::sampleRate);
         std::vector<float>().swap (mono);
+        if (features != nullptr)
+            *features = analyseTake (audio, peaks, clipped);
 
         // Only the sung parts are listened to, joined end to end with a short pause between them: long
         // silences (the bars before you come in, a break) throw the recognizer's word times off badly.

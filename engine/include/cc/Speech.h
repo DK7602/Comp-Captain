@@ -12,6 +12,7 @@
 #include <string_view>
 #include <vector>
 
+#include "cc/Features.h"
 #include "cc/Words.h"
 
 namespace cc
@@ -50,8 +51,9 @@ namespace cc
     // Everything about a take that's worked out by listening: reads the take (a WAV file), finds its
     // phrases, and hears its words (words heard where nobody sings are dropped: the recognizer sometimes
     // "hears" words in silence). Empty optional if it was stopped or failed (error says why).
+    // features (optional): also works out what the take sounds like every 10 ms (for the scores), from the same read.
     std::optional<Hearing> hearTake (SpeechRecognizer&, const std::filesystem::path& wav,
-                                     const SpeechRecognizer::Options&, std::string& error);
+                                     const SpeechRecognizer::Options&, std::string& error, TakeFeatures* features = nullptr);
 
     // The parts of a take that are listened to: the sung phrases (with a little room either side, phrases
     // under a second apart kept together), each placed 'at' seconds into the joined audio, with a pause of

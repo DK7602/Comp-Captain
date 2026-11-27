@@ -7,10 +7,12 @@ FetchContent_MakeAvailable(Catch2)
 
 add_executable(cc_tests
     CaptureTests.cpp
+    FeaturesTests.cpp
     LineUpTests.cpp
     LyricsTests.cpp
     PeakMeterTests.cpp
     PhrasesTests.cpp
+    ScoresTests.cpp
     SongTimeTests.cpp
     SuiteDetectorTests.cpp
     TakeTests.cpp
@@ -40,4 +42,8 @@ if(CC_WITH_SPEECH)
 
     add_executable(cc_listen ListenTool.cpp)
     target_link_libraries(cc_listen PRIVATE cc_speech)
+
+    # cc_score <model> <lyrics.txt> <take1.wav> <take2.wav> ...: every line's scores for every take
+    add_executable(cc_score ScoreTool.cpp)
+    target_link_libraries(cc_score PRIVATE cc_speech)
 endif()

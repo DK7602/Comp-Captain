@@ -2,12 +2,14 @@
 add_library(cc_engine STATIC
     src/Align.cpp
     src/Capture.cpp
+    src/Features.cpp
     src/LineUp.cpp
     src/Overview.cpp
     src/Lyrics.cpp
     src/PeakMeter.cpp
     src/Phrases.cpp
     src/Resample.cpp
+    src/Scores.cpp
     src/SongTime.cpp
     src/SuiteDetector.cpp
     src/Take.cpp
