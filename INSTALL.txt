@@ -1,7 +1,7 @@
 COMP CAPTAIN - HOW TO INSTALL
 =============================
 
-This version is M3 (0.4.0): takes, lyrics and scores. Record takes with CAPTURE, add audio files, or bring in the takes
+This version is M3 (0.4.1): takes, lyrics and scores. Record takes with CAPTURE, add audio files, or bring in the takes
 on a Cubase track's lanes (ARA). Every take lands on its bar. Give it your lyrics and it listens to your takes and
 lines every line up, so the teleprompter follows your song. Scores and comping come next; those parts still show a
 sample song (marked SAMPLE). On your track it passes your audio through untouched.

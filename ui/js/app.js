@@ -48,7 +48,7 @@
     align: JSON.parse(JSON.stringify(D.alignDefaults)),
     exportOn: {},
     sonicology: { voxology: 'installed', mixology: 'installed' },
-    version: '0.4.0', host: 'Browser preview',
+    version: '0.4.1', host: 'Browser preview',
     level: 0,
   };
   if (!PAGES.includes(S.page)) S.page = 'comp';
@@ -269,6 +269,9 @@
     const l = SS.lines[S.sl];
     return l && SG.timed(l) && l.startQ >= 0 ? [l.startQ, l.endQ] : null;
   }
+  // The line on screen: inside the plug-in it's a line of your lyrics (S.sl); the browser demo also keeps the
+  // sample song's line (S.line), which the plug-in never moves.
+  const curLine = () => (Bridge.inHost ? S.sl : S.line);
   function setLine(li, seek) {
     S.sl = Math.max(0, Math.min(SS.lines.length - 1, li));
     const sec = SG.sectionOf(S.sl);
@@ -1153,10 +1156,10 @@
   function wire() {
     $('#logo').onclick = () => setTheme(S.theme === 'dark' ? 'light' : 'dark', true);
     $$('.nav-btn').forEach((b) => { b.onclick = () => setPage(b.dataset.go, true); });
-    $('#line-prev').onclick = () => setLine(S.line - 1, true);
-    $('#line-next').onclick = () => setLine(S.line + 1, true);
-    $('#ov-left').onclick = () => setLine(S.line - 1, true);
-    $('#ov-right').onclick = () => setLine(S.line + 1, true);
+    $('#line-prev').onclick = () => setLine(curLine() - 1, true);
+    $('#line-next').onclick = () => setLine(curLine() + 1, true);
+    $('#ov-left').onclick = () => setLine(curLine() - 1, true);
+    $('#ov-right').onclick = () => setLine(curLine() + 1, true);
     $('#overview').onclick = (e) => {
       const sp = SG.span(); if (!sp) return;
       const r = e.currentTarget.getBoundingClientRect(), t = sp[0] + (e.clientX - r.left) / r.width * (sp[1] - sp[0]);
@@ -1289,8 +1292,8 @@
       if (e.target.tagName === 'TEXTAREA') return;
       if (e.key === 'Escape') { $$('.overlay').forEach((o) => { o.hidden = true; }); closeMenu(); }
       if (S.page !== 'comp') return;
-      if (e.key === 'ArrowLeft') { setLine((realScores() ? S.sl : S.line) - 1, true); e.preventDefault(); }
-      if (e.key === 'ArrowRight') { setLine((realScores() ? S.sl : S.line) + 1, true); e.preventDefault(); }
+      if (e.key === 'ArrowLeft') { setLine(curLine() - 1, true); e.preventDefault(); }
+      if (e.key === 'ArrowRight') { setLine(curLine() + 1, true); e.preventDefault(); }
       if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && realScores()) { stepPick(e.key === 'ArrowUp' ? -1 : 1); e.preventDefault(); return; }
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { if (realScores()) e.preventDefault(); }
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {

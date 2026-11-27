@@ -341,6 +341,11 @@ quieter with noise, clipped): each caught with the right reason, the untouched t
 - Not yet: hearing a take or the comp from the plug-in, and making the comp audio (M4). Pitch against the song's key
   (we use the semitones in the singer's tuning). The take rows' waveforms use the song-level line span.
 
+0.4.1: the owner's first M3 test in Cubase (10 takes of a 4-line verse, every line lined up and scored). The < and >
+arrows by the lyric stepped from the browser demo's line (always line 3) instead of the line on screen, so they
+skipped line 3 and never reached line 1; the keyboard arrows were right. Both now use the line on screen (interface
+test: next, next, back, back through three lines). The owner calls a lyric line a "bar".
+
 ### M4 - Comp
 Auto Comp, the comp view, auditioning, swapping, joins and crossfades, level match, undo, saving with the project,
 drag to DAW. Pass: a comped verse with no clicks or jumps at the joins.

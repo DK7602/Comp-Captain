@@ -271,6 +271,19 @@ const { chromium } = require('playwright');
   check(takeRows.join() === 'Take 1|90%|false,Take 2|95%|true,Take 3|94%|false', 'the Comp page shows every take of the line with its total, the best one ticked (' + takeRows.join(', ') + ')');
   check((await p.textContent('#take-rows .take-row:nth-child(3) .warn-badge')) !== '', 'a take with a problem shows the warning');
   check((await p.textContent('#reasons')).includes('Every word comes through clearly') && (await p.textContent('#sc-best')).includes('Best: Take 2'), 'Line Scores shows the chosen take and why');
+  // the arrows by the lyric step one line at a time, from the line on screen
+  const lineNow = async () => (await p.textContent('#line-text')).trim();
+  check((await lineNow()) === 'I was lost in the dark', 'the lyric bar shows line 1 (' + (await lineNow()) + ')');
+  await p.click('#line-next'); await p.waitForTimeout(50);
+  const l2 = await lineNow();
+  await p.click('#line-next'); await p.waitForTimeout(50);
+  const l3 = await lineNow();
+  await p.click('#line-prev'); await p.waitForTimeout(50);
+  const back2 = await lineNow();
+  await p.click('#line-prev'); await p.waitForTimeout(50);
+  const back1 = await lineNow();
+  check(l2 === 'but You found me' && l3 === 'I\'m alive, I\'m alive' && back2 === 'but You found me' && back1 === 'I was lost in the dark',
+    'next and back step through every line (' + [l2, l3, back2, back1].join(' / ') + ')');
   await sent();
   await p.click('#take-rows .take-row:nth-child(1) .name');
   out = await sent();

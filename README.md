@@ -4,7 +4,7 @@
 the best performance out of the best lines, and lines up your doubles, stacks, ad-libs and doubled guitars so they
 sit tight with the lead.
 
-Status: **M3, takes, lyrics and scores (0.4.0).** CAPTURE records every pass through the track as a take stamped with its
+Status: **M3, takes, lyrics and scores (0.4.1).** CAPTURE records every pass through the track as a take stamped with its
 bar; audio files (WAV, AIFF, FLAC, MP3) can be dropped in; as a Cubase Extension (ARA) it lists and plays the takes on
 a track's lanes. Lyrics (pasted, .txt / .lrc / .docx, or written by Hear It) are shared by every copy in the project;
 each vocal take is listened to in the background (whisper.cpp, on the computer) and every line is lined up with the
