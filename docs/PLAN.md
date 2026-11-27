@@ -296,6 +296,8 @@ Pass: on the owner's real takes, lines land within a word of where they belong.
   kept stays in the take list until a take is saved. Manual: Cubase's Direct Monitoring bypasses the track's inserts.
 - Owner, 2026-11-27: the track's monitor button was off; turned on, takes save. (Likely also why the first take's
   words never matched: whatever came through the track wasn't the live singing. Not confirmed.)
+- **Owner's Cubase test, 2026-11-27 (0.3.5): passed.** Takes save with the monitor on; after a take is listened to,
+  the teleprompter follows the singing ("the lyrics followed along this time, it worked").
 - Not yet: ARA takes aren't listened to yet (their audio comes through the ARA reader: later);
   dragging a line's ends by hand (M3/M4, with comping).
 

@@ -4,14 +4,14 @@ Comp Captain is a planned JUCE 8 plug-in and standalone app (VST3, Standalone, A
 line of every vocal take, builds the best comp from them, and tightens doubles, stacks, ad-libs, backing vocals and
 doubled guitars to the lead. **The plan is `docs/PLAN.md`: read it first.**
 
-## Status (2026-11-27): M2 built (0.3.5), owner testing. Takes weren't saving because the track's monitor button was off (CAPTURE only hears what goes through the track): with it on, takes save. Next: does the teleprompter follow once a take is listened to? Beat scroll before the first take (0.3.4, owner's idea).
+## Status (2026-11-27): M2 done (0.3.5), tested in Cubase by the owner: takes save (track monitor on), lyrics follow the singing after a take is listened to, beat scroll before the first take. Next: M3 (scores) on the owner's go; needs 5+ takes of one part from the owner.
 
 - **M0 (the look)** done, 0.1.1, tested in Cubase by the owner (loads clean; sharper waveforms, bigger lyric text,
   navy Assistant badge backing).
 - **M1 (takes in)** built, version 0.2.0: CAPTURE, file drop, take list with roles and hearts, takes on the song's
   bars, track picker across copies, ARA Extension with a copyable report. Details in `docs/PLAN.md` (M1 status).
   The owner tested it in Cubase: CAPTURE works. ARA report from Cubase Artist still to come (not blocking).
-- **M2 (lines and lyrics)** built, version 0.3.0: lyrics (paste / .txt / .lrc / .docx, shared by every copy, saved
+- **M2 (lines and lyrics)** done, 0.3.0-0.3.5, owner-tested ("the lyrics followed along, it worked"): lyrics (paste / .txt / .lrc / .docx, shared by every copy, saved
   with the project), background listening with whisper.cpp (model inside each bundle), lines lined up across takes,
   teleprompter following the DAW with count-in, Hear It, From My Songs (Song Rider Pro's exported page; Song
   Savant / Key Compass hold no lyrics). Details in `docs/PLAN.md`
