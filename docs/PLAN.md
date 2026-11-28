@@ -349,6 +349,11 @@ test: next, next, back, back through three lines). The owner calls a lyric line 
 0.4.2: the owner looked for "your pick matches on N of M lines" before picking any takes (Review only shows it once
 there are picks). With no picks yet, the Review page's Assistant now says to pick takes on the Comp page.
 
+**Owner's M3 test (2026-11-28, 0.4.1, Cubase Artist 14):** 10 takes of a 4-line rap verse ("Rick" birthday), all 4
+lines lined up and scored on 8 takes (2 short takes heard one word each). Comp Captain's best: T2, T7, T8, T8, all
+78-86% under Singing, no warnings. The owner's picks matched Comp Captain's on 2 of 3 lines (most lines: pass, on a
+small sample). Asked which line differed and why, for tuning.
+
 ### M4 - Comp
 Auto Comp, the comp view, auditioning, swapping, joins and crossfades, level match, undo, saving with the project,
 drag to DAW. Pass: a comped verse with no clicks or jumps at the joins.

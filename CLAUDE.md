@@ -4,7 +4,7 @@ Comp Captain is a planned JUCE 8 plug-in and standalone app (VST3, Standalone, A
 line of every vocal take, builds the best comp from them, and tightens doubles, stacks, ad-libs, backing vocals and
 doubled guitars to the lead. **The plan is `docs/PLAN.md`: read it first.**
 
-## Status (2026-11-27): M3 (scores) built, 0.4.2, owner testing in Cubase (their 10 takes of a 4-line rap verse score; picks count not in yet. Takes not shared with us: scores were tuned on the owner's Don vocal with altered copies)
+## Status (2026-11-28): M3 (scores) 0.4.2, owner-tested in Cubase: 10 takes of a 4-line rap verse, "your pick matches on 2 of 3 lines", no false flags (asked which line differed and why). Next: M4 (Comp). Takes not shared with us: scores were tuned on the owner's Don vocal with altered copies
 
 - **M0 (the look)** done, 0.1.1, tested in Cubase by the owner (loads clean; sharper waveforms, bigger lyric text,
   navy Assistant badge backing).
