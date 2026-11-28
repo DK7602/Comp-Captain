@@ -13,6 +13,7 @@ add_executable(cc_tests
     LyricsTests.cpp
     PeakMeterTests.cpp
     PhrasesTests.cpp
+    PlayerTests.cpp
     ScoresTests.cpp
     SongTimeTests.cpp
     SuiteDetectorTests.cpp

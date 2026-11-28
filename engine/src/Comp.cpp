@@ -443,7 +443,7 @@ namespace cc
         const double ppq = ref.ppq + (seconds - ref.seconds) * bpm / 60.0;
         const auto refBar = barBeatAt (ref);
         const double refBarPpq = ref.ppq - (refBar.beat - 1.0) * ref.meter.quartersPerBeat();
-        const double k = std::floor ((ppq - refBarPpq) / qpb + 1e-9);
+        const double k = std::floor ((ppq - refBarPpq) / qpb + 1e-6); // a hair under a bar line counts as on it
         BarStart out;
         out.ppq = refBarPpq + k * qpb;
         out.bar = refBar.bar + (int) k;

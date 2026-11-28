@@ -58,6 +58,8 @@ private:
     void hearIt (const juce::var& message);
     juce::String listeningReport();
     void sendScores (bool force);
+    void sendAudition (bool force);
+    void sendBuilt (bool force);
 
     // adding files
     void chooseFiles();
@@ -82,6 +84,8 @@ private:
     juce::uint32 sentTakesVersion = 0, sentAraVersion = 0, sentHearingVersion = 0;
     juce::uint64 sentSongVersion = 0;
     juce::String sentScores;
+    juce::String sentAudition;
+    juce::uint32 sentBuiltVersion = 0;
     juce::String sentListening;
     juce::String sentTracks, sentTransport, sentCapture;
     juce::uint32 liveSerial = 0;

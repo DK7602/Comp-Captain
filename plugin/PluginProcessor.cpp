@@ -8,6 +8,7 @@
 #include "cc/WavFile.h"
 
 #include <deque>
+#include <limits>
 
 namespace
 {
@@ -78,7 +79,44 @@ struct CompCaptainProcessor::Mailbox
     std::vector<Overview> overviews;
     std::vector<Listening::Result> heard;
     std::vector<std::shared_ptr<const CompCaptainProcessor::Scores>> scored;
+    struct Sound
+    {
+        juce::uint32 serial = 0;
+        std::unique_ptr<cc::Player::Clip> clip;
+        juce::String problem;
+    };
+    std::vector<Sound> sounds;                           // takes and comps to hear, worked out
+    std::vector<CompCaptainProcessor::Built> built;      // Build Performance results
     std::atomic<bool> closed { false };
+};
+
+// Everything the comp needs about this track's takes, gathered on the message thread for a background job.
+struct CompCaptainProcessor::CompJob
+{
+    std::deque<std::vector<cc::LinePlace>> places;
+    std::vector<std::shared_ptr<const cc::TakeFeatures>> features;
+    std::vector<cc::CompSource> sources;
+    std::vector<cc::CompFile> files;
+    std::map<std::uint64_t, cc::Take> takeOf;
+    std::vector<cc::CompChoice> choices;
+    cc::Lyrics lyrics;
+
+    const cc::CompSource* source (std::uint64_t key) const
+    {
+        for (auto& s : sources)
+            if (s.key == key)
+                return &s;
+        return nullptr;
+    }
+    // song seconds where a take starts singing a line (-1: it didn't)
+    double lineStart (std::uint64_t key, int line) const
+    {
+        if (const auto* s = source (key); s != nullptr && s->places != nullptr)
+            for (auto& p : *s->places)
+                if (p.line == line)
+                    return s->startSeconds + p.start;
+        return -1.0;
+    }
 };
 
 CompCaptainProcessor::CompCaptainProcessor()
@@ -159,6 +197,10 @@ double CompCaptainProcessor::getTailLengthSeconds() const
     if (getTailLengthSecondsForARA (tail))
         return tail;
 #endif
+    // A VST3 host may stop calling a plug-in on a quiet track. Comp Captain plays takes and the comp on its own (with
+    // the DAW stopped), so it asks to keep being called; what it does on each call costs next to nothing.
+    if (wrapperType == wrapperType_VST3)
+        return std::numeric_limits<double>::infinity();
     return 0.0;
 }
 
@@ -251,6 +293,10 @@ void CompCaptainProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
 
     for (int ch = ins; ch < getTotalNumOutputChannels(); ++ch)
         buffer.clear (ch, 0, n);
+
+    // Hearing a take or the comp from the window: it takes the track's place (never while recording).
+    const int outs = juce::jmin (getTotalNumOutputChannels(), buffer.getNumChannels());
+    player.process (buffer.getArrayOfWritePointers(), outs, n, getSampleRate(), t.playing, t.recording, t.hasSeconds ? t.seconds : 0.0);
 }
 
 int CompCaptainProcessor::useTimeSlice()
@@ -337,6 +383,7 @@ void CompCaptainProcessor::getStateInformation (juce::MemoryBlock& dest)
                 + cc::text::formatFixed (weights.clarity, 3) + "," + cc::text::formatFixed (weights.energy, 3) + "\n";
         for (auto& [line, pick] : picked)
             text += "pick=" + std::to_string (line) + " " + std::to_string (pick.take) + " " + cc::text::escape (pick.lineText) + "\n";
+        text += "picky=" + cc::text::formatFixed (picky, 3) + "\n";
         text += lyricsMarker;
         text += "stamp=" + std::to_string (lyricsStamp) + "\n";
         text += "text=" + cc::text::escape (lyrics) + "\n";
@@ -394,6 +441,7 @@ void CompCaptainProcessor::setStateInformation (const void* data, int sizeInByte
         style = "Singing";
         weights = *cc::styleWeights ("Singing");
         picked.clear();
+        picky = 0.7;
         uiState = cc::UiState::fromText (uiPart);
         cc::text::forEachKeyValue (trackPart, [&] (std::string_view key, std::string_view value) {
             std::int64_t i = 0;
@@ -409,6 +457,12 @@ void CompCaptainProcessor::setStateInformation (const void* data, int sizeInByte
                 seed = i;
             else if (key == "style")
                 style = cc::text::unescape (value);
+            else if (key == "picky")
+            {
+                double v = 0.7;
+                if (cc::text::parseDouble (value, v))
+                    picky = std::clamp (v, 0.0, 1.0);
+            }
             else if (key == "weights")
             {
                 double w[4] = { 0.25, 0.25, 0.25, 0.25 };
@@ -941,6 +995,7 @@ void CompCaptainProcessor::timerCallback()
     }
     scheduleListening();
     scheduleScoring();
+    collectAuditions();
 }
 
 // ============================================================================ scores
@@ -1313,3 +1368,289 @@ const ARA::ARAFactory* JUCE_CALLTYPE createARAFactory()
     return juce::ARADocumentControllerSpecialisation::createARAFactory<CompCaptainAraDocument>();
 }
 #endif
+
+// ============================================================================ the comp (M4)
+
+void CompCaptainProcessor::setComp (std::vector<CompLine> lines, double howPicky)
+{
+    bool changed = false;
+    {
+        const std::scoped_lock lock (stateLock);
+        std::sort (lines.begin(), lines.end(), [] (const CompLine& a, const CompLine& b) { return a.line < b.line; });
+        const auto same = [] (const std::vector<CompLine>& a, const std::vector<CompLine>& b) {
+            return a.size() == b.size() && std::equal (a.begin(), a.end(), b.begin(), [] (const CompLine& x, const CompLine& y) { return x.line == y.line && x.take == y.take; });
+        };
+        changed = ! same (lines, compLines);
+        compLines = std::move (lines);
+        howPicky = std::clamp (howPicky, 0.0, 1.0);
+        if (std::abs (howPicky - picky) > 1e-6)
+        {
+            picky = howPicky;
+            updateHostDisplay (ChangeDetails().withNonParameterStateChanged (true));
+        }
+    }
+    // hearing the comp in time while it changes: work it out again (it carries on from the same song position)
+    if (changed && auditionState.what == "comp" && auditionState.inTime)
+        startAudition ("comp", 0, -1, true);
+}
+
+double CompCaptainProcessor::compPicky() const
+{
+    const std::scoped_lock lock (stateLock);
+    return picky;
+}
+
+std::shared_ptr<CompCaptainProcessor::CompJob> CompCaptainProcessor::gatherComp (bool withChoices) const
+{
+    auto job = std::make_shared<CompJob>();
+    const auto song = CompCaptainProcessor::song();
+    job->lyrics = song->lyrics;
+    const std::scoped_lock lock (stateLock);
+    const auto folder = juce::File (fromStd (takes.folder));
+    for (auto& t : takes.all())
+    {
+        const auto h = hearings.find (t.id);
+        if (t.source == cc::TakeSource::ara || ! cc::isSung (t.role) || h == hearings.end() || ! h->second.done)
+            continue;
+        const std::uint64_t key = (uniqueId << 32) | t.id;
+        const auto placed = song->lineUp.takes.find (key);
+        if (placed == song->lineUp.takes.end())
+            continue;
+        job->places.push_back (placed->second);
+        job->features.push_back (h->second.features);
+        cc::CompSource s;
+        s.key = key;
+        s.startSeconds = t.start.seconds;
+        s.lengthSeconds = t.lengthSeconds();
+        s.places = &job->places.back();
+        s.features = h->second.features.get();
+        job->sources.push_back (s);
+        job->files.push_back ({ key, toPath (folder.getChildFile (fromStd (t.file))), t.start.seconds });
+        job->takeOf[key] = t;
+    }
+    if (withChoices)
+        for (auto& c : compLines)
+            job->choices.push_back ({ c.line, (uniqueId << 32) | c.take });
+    return job;
+}
+
+void CompCaptainProcessor::hearTakeLine (std::uint32_t take, int line) { startAudition ("take", take, line, transport().playing); }
+void CompCaptainProcessor::hearComp (int fromLine) { startAudition ("comp", 0, fromLine, transport().playing); }
+void CompCaptainProcessor::hearInTime (std::uint32_t take) { startAudition (take != 0 ? "take" : "comp", take, -1, true); }
+
+void CompCaptainProcessor::stopHearing()
+{
+    ++auditionSerial;
+    player.stop();
+    auditionState = {};
+}
+
+void CompCaptainProcessor::startAudition (const juce::String& what, std::uint32_t take, int line, bool inTime)
+{
+    const auto serial = ++auditionSerial;
+    Audition a;
+    a.what = what;
+    a.take = take;
+    a.line = line;
+    a.inTime = inTime;
+    a.preparing = true;
+    a.seconds = auditionState.seconds;
+    auditionState = a;
+    auditionTicks = 0;
+
+    auto job = gatherComp (what == "comp");
+    const double rate = getSampleRate() > 0.0 ? getSampleRate() : 48000.0;
+    const int channels = juce::jlimit (1, 2, getTotalNumOutputChannels());
+    const std::uint64_t key = (uniqueId << 32) | take;
+    jobs->addJob ([box = mailbox, job, what, key, line, inTime, rate, channels, serial]
+    {
+        if (box->closed.load())
+            return;
+        cc::CompPlan plan;
+        double from = -1.0;
+        juce::String problem;
+        if (what == "take")
+        {
+            if (const auto* src = job->source (key))
+            {
+                plan = inTime ? cc::planTake (*src) : cc::planLine (*src, line);
+                if (plan.empty())
+                    problem = "That take didn't sing this line.";
+            }
+            else
+                problem = "That take hasn't been listened to yet.";
+        }
+        else
+        {
+            plan = cc::planComp (job->choices, job->sources);
+            if (plan.empty())
+                problem = "No comp yet: once your takes are scored, every line gets its take.";
+            else if (line >= 0)
+                for (auto& c : job->choices)
+                    if (c.line >= line)
+                    {
+                        from = job->lineStart (c.take, c.line) - 0.4;
+                        break;
+                    }
+        }
+        Mailbox::Sound sound;
+        sound.serial = serial;
+        if (problem.isEmpty() && plan.end - plan.start > 600.0)
+            problem = "That's too long to play from here (over 10 minutes).";
+        if (problem.isEmpty())
+        {
+            std::string error;
+            auto audio = cc::renderComp (plan, job->files, plan.start, plan.end, rate, channels, &box->closed, error);
+            if (! audio)
+                problem = fromStd (error);
+            else
+            {
+                auto clip = std::make_unique<cc::Player::Clip>();
+                clip->channels = std::move (audio->channels);
+                clip->sampleRate = rate;
+                clip->songStart = plan.start;
+                clip->inTime = inTime;
+                clip->id = serial;
+                if (! inTime && from > plan.start)
+                    clip->playFrom = (std::int64_t) std::llround ((from - plan.start) * rate);
+                sound.clip = std::move (clip);
+            }
+        }
+        sound.problem = problem;
+        const std::scoped_lock lock (box->lock);
+        box->sounds.push_back (std::move (sound));
+    });
+}
+
+void CompCaptainProcessor::collectAuditions()
+{
+    std::vector<Mailbox::Sound> sounds;
+    std::vector<Built> results;
+    {
+        const std::scoped_lock lock (mailbox->lock);
+        sounds.swap (mailbox->sounds);
+        results.swap (mailbox->built);
+    }
+    for (auto& s : sounds)
+    {
+        if (s.serial != auditionSerial || auditionState.what.isEmpty())
+            continue; // asked for something else since
+        auditionState.preparing = false;
+        if (s.clip == nullptr)
+        {
+            auditionState.problem = s.problem;
+            player.stop();
+            continue;
+        }
+        player.play (std::move (s.clip));
+        auditionBlocks = blocksPlayed.load();
+        auditionTicks = 0;
+    }
+    player.tidy();
+
+    if (! auditionState.what.isEmpty() && ! auditionState.preparing && auditionState.problem.isEmpty())
+    {
+        const auto s = player.state();
+        auditionState.sounding = s.sounding;
+        auditionState.seconds = s.seconds;
+        if (! auditionState.inTime)
+        {
+            ++auditionTicks;
+            if (s.finished)
+                stopHearing(); // it played to the end (or the DAW started)
+            else if (! s.sounding && auditionTicks > 8 && blocksPlayed.load() == auditionBlocks)
+            {
+                // the DAW isn't calling Comp Captain while it's stopped
+                player.stop();
+                auditionState.problem = "Cubase isn't running Comp Captain while it's stopped. Turn on the track's monitor button "
+                                        "(the speaker), or press Play in Cubase: then it plays in time with the song.";
+            }
+        }
+    }
+
+    for (auto& r : results)
+    {
+        {
+            const std::scoped_lock lock (stateLock);
+            built = r;
+        }
+        building.store (false);
+        builtChanged.fetch_add (1);
+        addNews (r.ok ? "saved" : "failed", r.message);
+    }
+}
+
+void CompCaptainProcessor::buildComp()
+{
+    if (building.exchange (true))
+        return;
+    auto job = gatherComp (true);
+    const auto folder = takesFolder();
+    const auto role = fromStd (std::string (cc::toLabel (trackRole())));
+    jobs->addJob ([box = mailbox, job, folder, role]
+    {
+        if (box->closed.load())
+            return;
+        Built result;
+        const auto plan = cc::planComp (job->choices, job->sources);
+        if (plan.empty())
+            result.message = "No comp yet: once your takes are scored, every line gets its take.";
+        else
+        {
+            // start on the bar line before the comp, at the takes' own sample rate and width
+            const auto& firstTake = job->takeOf[plan.pieces.front().take];
+            const auto bar = cc::barStartBefore (firstTake.start, plan.start);
+            double rate = firstTake.sampleRate > 0.0 ? firstTake.sampleRate : 48000.0;
+            int channels = 1;
+            for (auto& p : plan.pieces)
+                channels = std::max (channels, job->takeOf[p.take].channels);
+            channels = std::min (channels, 2);
+            std::string error;
+            const auto audio = cc::renderComp (plan, job->files, bar.seconds, plan.end, rate, channels, &box->closed, error);
+            if (! audio)
+                result.message = "Couldn't build the comp: " + fromStd (error);
+            else
+            {
+                // "Lead Comp - Verse 1 (bar 9).wav", or "Verse 1 to Chorus"
+                const auto sectionOf = [&] (int line) -> juce::String {
+                    if (line < 0 || line >= (int) job->lyrics.lines.size())
+                        return {};
+                    const auto sec = job->lyrics.lines[(size_t) line].section;
+                    return sec >= 0 && sec < (int) job->lyrics.sections.size() ? fromStd (job->lyrics.sections[(size_t) sec].name) : juce::String();
+                };
+                const auto first = sectionOf (plan.pieces.front().firstLine), last = sectionOf (plan.pieces.back().lastLine);
+                juce::String part = first.isNotEmpty() && last.isNotEmpty() && first != last ? first + " to " + last : (first.isNotEmpty() ? first : last);
+                juce::String base = role + " Comp" + (part.isNotEmpty() ? " - " + part : juce::String()) + " (bar " + juce::String (bar.bar) + ")";
+                base = base.removeCharacters ("\\/:*?\"<>|").trim();
+                auto file = folder.getChildFile (base + ".wav");
+                for (int n = 2; file.exists() && n < 1000; ++n)
+                    file = folder.getChildFile (base + " " + juce::String (n) + ".wav");
+                folder.createDirectory();
+                cc::WavWriter w;
+                std::vector<const float*> ptrs;
+                for (auto& c : audio->channels)
+                    ptrs.push_back (c.data());
+                if (w.open (toPath (file), rate, channels) && w.write (ptrs.data(), (int) audio->frames()) && w.close())
+                {
+                    result.ok = true;
+                    result.file = file;
+                    result.bar = bar.bar;
+                    result.message = file.getFileName() + " is ready: drag it into your DAW at bar " + juce::String (bar.bar) + ".";
+                }
+                else
+                {
+                    file.deleteFile();
+                    result.message = "Couldn't save the comp in " + folder.getFullPathName() + " (is the disk full?).";
+                }
+            }
+        }
+        const std::scoped_lock lock (box->lock);
+        box->built.push_back (result);
+    });
+}
+
+std::optional<CompCaptainProcessor::Built> CompCaptainProcessor::lastBuilt() const
+{
+    const std::scoped_lock lock (stateLock);
+    return built;
+}

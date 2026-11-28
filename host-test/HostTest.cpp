@@ -355,6 +355,9 @@ int main (int argc, char** argv)
     if (plugin == nullptr)
         return 1;
     check (plugin->getLatencySamples() == 0, "adds no delay");
+    plugin->prepareToPlay (48000.0, 512);
+    check (std::isinf (plugin->getTailLengthSeconds()), "asks to keep being called while the DAW is stopped (so a take can be heard from it)");
+    plugin->releaseResources();
 
     // 3. Play: untouched, stereo and mono
     check (passesAudioUntouched (*plugin, 2), "stereo audio passes through bit for bit");

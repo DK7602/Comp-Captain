@@ -6,9 +6,11 @@
 #include "AraSupport.h"
 #include "Listening.h"
 #include "cc/Capture.h"
+#include "cc/Comp.h"
 #include "cc/LineUp.h"
 #include "cc/Scores.h"
 #include "cc/PeakMeter.h"
+#include "cc/Player.h"
 #include "cc/Take.h"
 #include "cc/UiState.h"
 
@@ -16,6 +18,7 @@
 #include <functional>
 #include <map>
 #include <mutex>
+#include <optional>
 
 // The plug-in. On its track it passes audio through untouched (bit for bit). M1 adds:
 //  - CAPTURE: while armed and the DAW records, every pass becomes a take (written by a background
@@ -209,6 +212,49 @@ public:
     void clearPicks();
     void setPicks (std::map<int, Pick>);                                       // all at once (undo / redo)
 
+    // ---------------------------------------------------------------- the comp (M4)
+    // Which take sings each line: the window works it out (your picks, else the best take, keeping one take going
+    // the more the slider leans to Fewer cuts) and hands it over. How picky is saved with the project.
+    struct CompLine
+    {
+        int line = 0;
+        std::uint32_t take = 0;
+    };
+    void setComp (std::vector<CompLine>, double picky);
+    double compPicky() const;
+
+    // Hearing takes and the comp from the plug-in (only while the window is open). With the DAW stopped they play
+    // straight away; while it plays they take the track's place in time with the song.
+    void hearTakeLine (std::uint32_t take, int line); // one take of one line
+    void hearComp (int fromLine);                     // the comp, from a line (-1: the start)
+    void hearInTime (std::uint32_t take);             // in place of the track while the DAW plays: one take, or the comp (0)
+    void stopHearing();
+    struct Audition
+    {
+        juce::String what;       // "" (the track as it is), "take" or "comp"
+        std::uint32_t take = 0;
+        int line = -1;
+        bool inTime = false;     // follows the DAW's playhead
+        bool preparing = false;  // being worked out
+        bool sounding = false;   // playing right now
+        double seconds = 0.0;    // song seconds being played
+        juce::String problem;    // why it can't be heard, in plain words
+    };
+    Audition audition() const { return auditionState; }
+
+    // Build Performance: the comp as one WAV file in the takes folder, starting on a bar line (drop it on that bar).
+    struct Built
+    {
+        bool ok = false;
+        juce::File file;
+        int bar = 1;
+        juce::String message;
+    };
+    void buildComp();
+    bool buildingComp() const noexcept { return building.load(); }
+    std::optional<Built> lastBuilt() const;
+    juce::uint32 builtVersion() const noexcept { return builtChanged.load(); }
+
 private:
     void timerCallback() override;
     int useTimeSlice() override;
@@ -265,6 +311,22 @@ private:
     std::string style = "Singing";
     cc::ScoreWeights weights = *cc::styleWeights ("Singing");
     std::map<int, Pick> picked;
+
+    // the comp and hearing it
+    struct CompJob;
+    std::shared_ptr<CompJob> gatherComp (bool withChoices) const;
+    void startAudition (const juce::String& what, std::uint32_t take, int line, bool inTime);
+    void collectAuditions();
+    cc::Player player;
+    std::vector<CompLine> compLines;                  // under stateLock
+    double picky = 0.7;                               // under stateLock
+    Audition auditionState;                           // message thread
+    juce::uint32 auditionSerial = 0;                  // message thread
+    juce::uint32 auditionBlocks = 0;
+    int auditionTicks = 0;
+    std::atomic<bool> building { false };
+    std::optional<Built> built;                       // under stateLock
+    std::atomic<juce::uint32> builtChanged { 1 };
     juce::SharedResourcePointer<Listening> listening;
     std::map<std::uint32_t, TakeHearing> hearings;   // under stateLock
     std::atomic<juce::uint32> heardChanged { 1 };

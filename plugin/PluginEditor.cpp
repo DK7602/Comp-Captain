@@ -85,6 +85,10 @@ CompCaptainEditor::CompCaptainEditor (CompCaptainProcessor& p)
 CompCaptainEditor::~CompCaptainEditor()
 {
     stopTimer();
+    // hearing takes and the comp only while the window is open: back to the track as it is
+    processor.stopHearing();
+    if (viewing != 0 && viewing != processor.instanceId())
+        CompCaptainProcessor::withTrack (viewing, [] (CompCaptainProcessor& p) { p.stopHearing(); });
     for (auto& [id, u] : uploads)
     {
         u.out.reset();
@@ -213,10 +217,15 @@ void CompCaptainEditor::handleUiEvent (const juce::var& message)
     else if (type == "viewTrack")
     {
         const auto id = (juce::uint64) message.getProperty ("id", 0).toString().getLargeIntValue();
+        // stop hearing the track we're leaving
+        withViewed ([] (CompCaptainProcessor& p) { p.stopHearing(); });
         viewing = id == processor.instanceId() ? 0 : id;
         sentTakesVersion = 0;
         sendTakes();
         sendTracks (true);
+        sendScores (true);
+        sendAudition (true);
+        sendBuilt (true);
     }
     else if (type == "trackRole")
     {
@@ -286,6 +295,58 @@ void CompCaptainEditor::handleUiEvent (const juce::var& message)
             }
         withViewed ([&] (CompCaptainProcessor& p) { p.setPicks (all); });
         sendScores (true);
+    }
+    else if (type == "comp")
+    {
+        // which take sings each line (worked out by the window), and how picky
+        std::vector<CompCaptainProcessor::CompLine> lines;
+        if (const auto* list = message.getProperty ("lines", {}).getArray())
+            for (auto& l : *list)
+                if (const auto take = ownId (l.getProperty ("id", {}).toString()))
+                    lines.push_back ({ (int) l.getProperty ("line", -1), *take });
+        const double howPicky = (double) message.getProperty ("picky", 0.7);
+        withViewed ([&] (CompCaptainProcessor& p) { p.setComp (lines, howPicky); });
+    }
+    else if (type == "hear")
+    {
+        const auto what = message.getProperty ("what", {}).toString();
+        const auto take = ownId (message.getProperty ("id", {}).toString()).value_or (0);
+        const int line = (int) message.getProperty ("line", -1);
+        const bool inTime = (bool) message.getProperty ("inTime", false);
+        if (viewing != 0 && viewing != processor.instanceId())
+            processor.stopHearing(); // only one track heard at a time
+        withViewed ([&] (CompCaptainProcessor& p) {
+            if (inTime)
+                p.hearInTime (what == "take" ? take : 0);
+            else if (what == "take" && take != 0)
+                p.hearTakeLine (take, line);
+            else if (what == "comp")
+                p.hearComp (line);
+        });
+        sendAudition (true);
+    }
+    else if (type == "hearStop")
+    {
+        processor.stopHearing();
+        withViewed ([] (CompCaptainProcessor& p) { p.stopHearing(); });
+        sendAudition (true);
+    }
+    else if (type == "build")
+    {
+        withViewed ([] (CompCaptainProcessor& p) { p.buildComp(); });
+        sendBuilt (true);
+    }
+    else if (type == "dragOut" || type == "reveal")
+    {
+        // only a file Comp Captain made, in its own folder
+        const juce::File file (message.getProperty ("file", {}).toString());
+        if (file.existsAsFile() && file.isAChildOf (CompCaptainProcessor::takesRoot()))
+        {
+            if (type == "reveal")
+                file.revealToUser();
+            else
+                juce::DragAndDropContainer::performExternalDragDropOfFiles ({ file.getFullPathName() }, false, this);
+        }
     }
     else if (type == "style")
     {
@@ -404,6 +465,8 @@ void CompCaptainEditor::sendInit()
     sendLyrics (true);
     sendListening (true);
     sendScores (true);
+    sendAudition (true);
+    sendBuilt (true);
 }
 
 void CompCaptainEditor::sendTakes()
@@ -662,6 +725,8 @@ void CompCaptainEditor::timerCallback()
         sendTakes();
     sendLyrics (false);
     sendScores (false);
+    sendAudition (false);
+    sendBuilt (false);
     if (tick % 3 == 0)
         sendListening (false);
     if (tick % 15 == 0)
@@ -897,6 +962,9 @@ void CompCaptainEditor::sendScores (bool force)
     msg->setProperty ("weights", juce::Array<juce::var> { weights.pitch, weights.timing, weights.clarity, weights.energy });
     msg->setProperty ("ready", ready);
     msg->setProperty ("any", scores != nullptr);
+    double howPicky = 0.7;
+    withViewed ([&] (CompCaptainProcessor& p) { howPicky = p.compPicky(); });
+    msg->setProperty ("picky", howPicky);
     send ("scores", msg);
 }
 
@@ -1151,4 +1219,58 @@ void CompCaptainEditor::uploadCancel (const juce::var& message)
         it->second.file.deleteFile();
         uploads.erase (it);
     }
+}
+
+// ============================================================================ hearing and building the comp (M4)
+
+// What's being heard from the plug-in (a take, the comp, or nothing), with the song position while it plays.
+void CompCaptainEditor::sendAudition (bool force)
+{
+    CompCaptainProcessor::Audition a;
+    bool building = false;
+    withViewed ([&] (CompCaptainProcessor& p) {
+        a = p.audition();
+        building = p.buildingComp();
+    });
+    const auto signature = a.what + "|" + juce::String (a.take) + "|" + juce::String (a.line) + "|" + juce::String ((int) a.inTime) + "|"
+                           + juce::String ((int) a.preparing) + "|" + juce::String ((int) a.sounding) + "|" + juce::String (a.seconds, 2) + "|"
+                           + a.problem + "|" + juce::String ((int) building);
+    if (! force && signature == sentAudition)
+        return;
+    sentAudition = signature;
+    auto* msg = new juce::DynamicObject();
+    msg->setProperty ("what", a.what);
+    msg->setProperty ("id", a.take != 0 ? "t" + juce::String (a.take) : juce::String());
+    msg->setProperty ("line", a.line);
+    msg->setProperty ("inTime", a.inTime);
+    msg->setProperty ("preparing", a.preparing);
+    msg->setProperty ("sounding", a.sounding);
+    msg->setProperty ("seconds", std::round (a.seconds * 100.0) / 100.0);
+    msg->setProperty ("problem", a.problem);
+    msg->setProperty ("building", building);
+    send ("audition", msg);
+}
+
+// The comp file Build Performance made (or why it couldn't).
+void CompCaptainEditor::sendBuilt (bool force)
+{
+    juce::uint32 version = 0;
+    std::optional<CompCaptainProcessor::Built> built;
+    bool building = false;
+    withViewed ([&] (CompCaptainProcessor& p) {
+        version = p.builtVersion();
+        built = p.lastBuilt();
+        building = p.buildingComp();
+    });
+    if (! force && version == sentBuiltVersion)
+        return;
+    sentBuiltVersion = version;
+    auto* msg = new juce::DynamicObject();
+    msg->setProperty ("building", building);
+    msg->setProperty ("ok", built.has_value() && built->ok);
+    msg->setProperty ("file", built.has_value() && built->ok ? built->file.getFullPathName() : juce::String());
+    msg->setProperty ("name", built.has_value() && built->ok ? built->file.getFileName() : juce::String());
+    msg->setProperty ("bar", built.has_value() ? built->bar : 0);
+    msg->setProperty ("message", built.has_value() ? built->message : juce::String());
+    send ("built", msg);
 }

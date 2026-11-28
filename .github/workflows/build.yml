@@ -79,6 +79,16 @@ jobs:
             "$HOST" "$VST3"
           fi
 
+      - name: Comp test (builds the comp and plays takes, with the plug-in's own code)
+        shell: bash
+        run: |
+          COMP=build/host-test/CompCaptainCompTest_artefacts/Release/CompCaptainCompTest
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            xvfb-run -a "$COMP"
+          else
+            "$COMP"
+          fi
+
       - name: ARA test (a pretend DAW uses it as an Extension)
         shell: bash
         run: |
