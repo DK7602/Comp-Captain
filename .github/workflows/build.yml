@@ -81,6 +81,7 @@ jobs:
 
       - name: Comp test (builds the comp and plays takes, with the plug-in's own code)
         shell: bash
+        timeout-minutes: 15
         run: |
           COMP=build/host-test/CompCaptainCompTest_artefacts/Release/CompCaptainCompTest
           if [ "$RUNNER_OS" = "Linux" ]; then

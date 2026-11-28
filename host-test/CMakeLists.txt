@@ -81,6 +81,9 @@ target_include_directories(CompCaptainCompTest PRIVATE "${juce_SOURCE_DIR}/modul
     $<TARGET_PROPERTY:CompCaptain,INCLUDE_DIRECTORIES>)
 target_compile_definitions(CompCaptainCompTest PRIVATE $<TARGET_PROPERTY:CompCaptain,COMPILE_DEFINITIONS>)
 target_link_libraries(CompCaptainCompTest PRIVATE CompCaptain cc_engine)
+if(APPLE)
+    target_link_libraries(CompCaptainCompTest PRIVATE "-framework CoreFoundation")
+endif()
 if(CC_WITH_SPEECH AND CC_WHISPER_MODEL)
     target_compile_definitions(CompCaptainCompTest PRIVATE
         CC_SPEECH_SAMPLE="${whisper_SOURCE_DIR}/samples/jfk.wav"

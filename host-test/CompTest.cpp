@@ -7,14 +7,21 @@
 // Exit code 0 = everything passed.
 #include "../plugin/PluginProcessor.h"
 
+#include <atomic>
+#include <chrono>
 #include <cmath>
 #include <iostream>
 #include <thread>
 #include <type_traits>
 
+#if JUCE_MAC
+ #include <CoreFoundation/CoreFoundation.h>
+#endif
+
 namespace
 {
     int failures = 0;
+    std::atomic<const char*> stage { "starting" }; // where the test is, if it ever gets stuck
 
     void check (bool ok, const juce::String& what)
     {
@@ -86,12 +93,33 @@ int main()
     juce::ScopedJuceInitialiser_GUI juceInit;
     std::cout << "Comp Captain comp test" << std::endl;
     int result = 1;
+    std::atomic<bool> done { false };
+
+    // if anything ever gets stuck, say where and stop (instead of holding up the build for hours)
+    std::thread watchdog ([&] {
+        for (int s = 0; s < 600 && ! done.load(); ++s)
+            std::this_thread::sleep_for (std::chrono::seconds (1));
+        if (! done.load())
+        {
+            std::cout << "  FAIL  stuck for 10 minutes at: " << stage.load() << std::endl;
+            std::_Exit (1);
+        }
+    });
     std::thread test ([&] {
         result = runTest();
+        done.store (true);
         juce::MessageManager::getInstance()->stopDispatchLoop();
     });
+   #if JUCE_MAC
+    // A console program has no NSApplication on the Mac, so JUCE's dispatch loop would return straight away. JUCE's
+    // messages arrive on the main run loop: run it here until the test is done.
+    while (! done.load())
+        CFRunLoopRunInMode (kCFRunLoopDefaultMode, 0.05, true);
+   #else
     juce::MessageManager::getInstance()->runDispatchLoop();
+   #endif
     test.join();
+    watchdog.join();
     return result;
 }
 
@@ -124,6 +152,7 @@ int runTest()
     juce::AudioBuffer<float> speech (1, (int) reader->lengthInSamples);
     reader->read (&speech, 0, (int) reader->lengthInSamples, 0, true, false);
 
+    stage = "making the plug-in";
     std::unique_ptr<CompCaptainProcessor> plugin;
     mt ([&] { plugin = std::make_unique<CompCaptainProcessor>(); });
     auto& p = *plugin;
@@ -164,6 +193,7 @@ int runTest()
                                          "ask what you can do for your country\n"); });
 
     // two takes: bar 9 (16 s) and again at bar 9, softer (a second pass of the same part)
+    stage = "recording two takes";
     mt ([&] { p.setArmed (true); });
     play (-1, 2048, 0.0f);
     pause (300);
@@ -186,11 +216,13 @@ int runTest()
         return 1;
     const auto t1 = takes[0].id, t2 = takes[1].id;
     // the DAW keeps running the plug-in while it's stopped; the test does too, so listening isn't held up
+    stage = "listening to the takes";
     check (waitFor ([&] { return p.takeHearingState (t1) == "done" && p.takeHearingState (t2) == "done"; }, 180000),
            "both takes listened to");
     check (waitFor ([&] { return p.scoresReady() && p.scores() != nullptr && ! p.scores()->lines.empty(); }, 60000), "the takes are scored");
 
     // the window's comp: take 1, take 2, take 1 (a join at every line)
+    stage = "building the comp";
     mt ([&] { p.setComp ({ { 0, t1 }, { 1, t2 }, { 2, t1 } }, 0.4); });
     check (std::abs (mt ([&] { return p.compPicky(); }) - 0.4) < 1e-9, "how picky the comp is, kept");
 
@@ -232,6 +264,7 @@ int runTest()
 
     // hearing take 2's second line with the DAW stopped: it plays from the plug-in, then stops by itself
     daw.playing = false;
+    stage = "hearing a take";
     mt ([&] { p.hearTakeLine (t2, 1); });
     check (waitFor ([&] { return ! p.audition().preparing; }, 10000), "the take is ready to hear");
     float heard = 0.0f;
@@ -263,6 +296,7 @@ int runTest()
     }
 
     // the comp in time with the song while the DAW plays: it takes the track's place there
+    stage = "hearing the comp in time";
     mt ([&] { p.hearInTime (0); });
     check (waitFor ([&] { return ! p.audition().preparing; }, 10000) && mt ([&] { return p.audition().problem.isEmpty(); }), "the comp is ready to hear in time");
     daw.playing = true;
@@ -290,6 +324,7 @@ int runTest()
     mt ([&] { p.getStateInformation (state); });
     check (state.toString().contains ("picky=0.400"), "saved with the project");
 
+    stage = "closing";
     mt ([&] {
         p.setPlayHead (nullptr);
         p.releaseResources();
