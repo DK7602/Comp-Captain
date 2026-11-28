@@ -48,7 +48,7 @@
     align: JSON.parse(JSON.stringify(D.alignDefaults)),
     exportOn: {},
     sonicology: { voxology: 'installed', mixology: 'installed' },
-    version: '0.4.1', host: 'Browser preview',
+    version: '0.4.2', host: 'Browser preview',
     level: 0,
   };
   if (!PAGES.includes(S.page)) S.page = 'comp';
@@ -953,6 +953,8 @@
       let sum = 0, cnt = 0, flagged = 0;
       SS.lines.forEach((l, i) => { const id = SCR.chosen(i), sc = id && SCR.scoreOf(i, id); if (!sc) return; const t = SCR.total(sc); sum += t; cnt++; if ((sc.problems || []).length || t < 75) flagged++; });
       const title = a.picked ? `Your pick matches Comp Captain\u2019s on ${a.same} of ${a.picked} line${a.picked === 1 ? '' : 's'}` : `Average score ${Math.round(sum / Math.max(1, cnt))}%${flagged ? ` \u00B7 ${flagged} line${flagged === 1 ? '' : 's'} to check` : ''}`;
+      // No picks of yours yet: say where to make them (the "matches on N of M lines" count needs them).
+      if (!a.picked) return [title, ['Pick your takes on the Comp page', 'Then this compares your picks', `Style: ${SCS.style}`]];
       return [title, [`Style: ${SCS.style}`, 'Hearts win ties', 'Click a line to comp it']];
     }
     return [`${scored} of ${n} lines scored across ${takes.size} take${takes.size === 1 ? '' : 's'}`, ['Click a take to pick it for the line', '\u2191 \u2193 step through the takes', `Style: ${SCS.style}`]];

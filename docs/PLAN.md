@@ -346,6 +346,9 @@ arrows by the lyric stepped from the browser demo's line (always line 3) instead
 skipped line 3 and never reached line 1; the keyboard arrows were right. Both now use the line on screen (interface
 test: next, next, back, back through three lines). The owner calls a lyric line a "bar".
 
+0.4.2: the owner looked for "your pick matches on N of M lines" before picking any takes (Review only shows it once
+there are picks). With no picks yet, the Review page's Assistant now says to pick takes on the Comp page.
+
 ### M4 - Comp
 Auto Comp, the comp view, auditioning, swapping, joins and crossfades, level match, undo, saving with the project,
 drag to DAW. Pass: a comped verse with no clicks or jumps at the joins.

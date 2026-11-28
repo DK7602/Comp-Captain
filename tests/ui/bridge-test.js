@@ -303,6 +303,7 @@ const { chromium } = require('playwright');
   await p.waitForTimeout(100);
   const reviewRows = await p.$$eval('#review-rows .rv', (r) => r.map((x) => x.querySelector('.tg') ? x.querySelector('.tg').textContent : '-'));
   check(reviewRows.join() === 'T2,T1,-', 'Review lists every line with its chosen take (' + reviewRows.join(', ') + ')');
+  check((await p.textContent('#msg-title')).startsWith('Average score') && (await p.textContent('#msg-ticks')).includes('Pick your takes on the Comp page'), 'with no picks yet, the Assistant says where to pick');
   await send({ type: 'scores', ready: true, any: true, style: 'Rap', weights: [0, 0.35, 0.35, 0.3], picks: { 0: { id: 't1', text: 'I was lost in the dark' }, 1: { id: 't1', text: 'but You found me' } },
     lines: [{ line: 0, takes: [sc('t1', 90, 90, 90, 90), sc('t2', 95, 95, 95, 95)] }, { line: 1, takes: [sc('t1', 99, 99, 99, 99), sc('t2', 80, 80, 80, 80)] }] });
   await p.waitForTimeout(100);
