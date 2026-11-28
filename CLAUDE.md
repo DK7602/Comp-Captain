@@ -4,7 +4,7 @@ Comp Captain is a planned JUCE 8 plug-in and standalone app (VST3, Standalone, A
 line of every vocal take, builds the best comp from them, and tightens doubles, stacks, ad-libs, backing vocals and
 doubled guitars to the lead. **The plan is `docs/PLAN.md`: read it first.**
 
-## Status (2026-11-28): M3 (scores) 0.4.2, owner-tested in Cubase: 10 takes of a 4-line rap verse, "your pick matches on 2 of 3 lines", no false flags (asked which line differed and why). Next: M4 (Comp). Takes not shared with us: scores were tuned on the owner's Don vocal with altered copies
+## Status (2026-11-28): M4 (comp) built, 0.5.0, waiting for the owner's Cubase test. M3 passed in Cubase ("your pick matches on 4 of 4 lines" on the owner's 10 takes of a 4-line rap verse)
 
 - **M0 (the look)** done, 0.1.1, tested in Cubase by the owner (loads clean; sharper waveforms, bigger lyric text,
   navy Assistant badge backing).
@@ -23,6 +23,15 @@ doubled guitars to the lead. **The plan is `docs/PLAN.md`: read it first.**
   takes' sound up in song time, Clarity from what was heard, Energy vs the other takes; problems: clipping, pops,
   loud breath, noise), plain reasons, Styles, the owner's picks per line (saved), Review with "your pick matches on
   N of M lines". Details in `docs/PLAN.md` (M3 status). `cc_score` tries it on real takes.
+- **M4 (comp)** built, 0.5.0: engine `Comp` (pieces per take, joins in the quietest spot between lines, 15 / 40 ms
+  equal-power crossfades, gain-only level match take vs take on the same lines, render, bar line before) and
+  `Player` (lock-free clip handoff: free play while the DAW is stopped, in time while it plays, never while
+  recording). The window works out the comp (picks, else best; Fewer cuts = switch cost between close lines) and
+  sends it (`comp`); the plug-in plays takes / the comp (`hear`, `hearStop`, A/B) and builds "Lead Comp - Verse 1
+  (bar 9).wav" (`build`), dragged out with `dragOut` (JUCE performExternalDragDropOfFiles, from the web view's
+  pointer move). VST3 reports an endless tail so Cubase keeps calling it while stopped. `CompCaptainCompTest`
+  (host-test/CompTest.cpp) links the plug-in's shared code and tests it all with the speech sample. `cc_comp`
+  tries it on real takes. Details in `docs/PLAN.md` (M4 status).
 - The owner cares most about **big lyrics on the Record page** (the teleprompter).
 - Decisions are in `docs/PLAN.md`, "Decisions after the art". Interface: **web view** (`ui/`), packed into the
   plug-in. Keep the title, logo, glows and backgrounds exactly as the owner's art (`art/`); layout is ours.

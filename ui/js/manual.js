@@ -7,11 +7,13 @@ const Manual = `
 <p>You sing a part five or ten times. Comp Captain listens to every take, scores every line, and builds one great
 performance from the best lines. You approve every pick. Then it lines up your doubles, ad-libs, backing vocals and
 doubled guitars so they sit tight with the lead, and hands the finished parts back to your DAW.</p>
-<p><b>This version (M3) brings your takes and lyrics in, and scores every line of every take.</b> Record takes with CAPTURE, add audio files, or let
-Cubase hand over the takes on a track's lanes. Every take lands on the bar it belongs to. Give Comp Captain your
-lyrics and it listens to each take and works out where every line is sung, so the teleprompter follows your song.
-Building the finished comp, tightening and exporting come in the next versions: until then those parts show a
-sample song, marked with a gold <span class="soon">SAMPLE</span> tag. On its track, Comp Captain passes your audio through untouched.</p>
+<p><b>This version (M4) brings your takes and lyrics in, scores every line of every take, and builds the comp.</b>
+Record takes with CAPTURE, add audio files, or let Cubase hand over the takes on a track's lanes. Every take lands on
+the bar it belongs to. Give Comp Captain your lyrics and it listens to each take and works out where every line is
+sung, so the teleprompter follows your song. Hear any take of any line, then Build Performance joins the best lines
+into one take you drag into your DAW. Tightening and the Export page come next: until then those parts show a
+sample song, marked with a gold <span class="soon">SAMPLE</span> tag. On its track, Comp Captain passes your audio
+through untouched (unless you ask it to play a take or the comp).</p>
 
 <h2>Recording takes (CAPTURE)</h2>
 <ol>
@@ -48,7 +50,7 @@ from the track or file name ("Vox Dbl L" is a double, "BGV" is backing). Click t
 <li><b>&#x2665;</b> marks a favourite: it wins ties when comping.</li>
 <li><b>&#x2022;&#x2022;&#x2022;</b> (or right-click) to rename or remove a take. Removing doesn't delete the file:
 it moves to a <b>Removed takes</b> folder inside the takes folder.</li>
-<li>Hearing a take on its own arrives with comping (M4). For now, play it in your DAW.</li>
+<li>To hear a take, use the <b>&#x25B6;</b> by each take on the Comp page (see "Hearing takes and the comp").</li>
 </ul>
 
 <h2>Adding takes from files</h2>
@@ -80,11 +82,11 @@ opens it in its own window, which you can make bigger.</p>
 <ul>
 <li><b>Record</b>: CAPTURE, your takes, and the teleprompter with your lyrics.</li>
 <li><b>Lyrics</b>: get the words in; Comp Captain lines each line up with your takes.</li>
-<li><b>Comp</b>: every take of every line with its scores, your picks, and the Song view of all your takes.
-Building the finished comp: <span class="soon">M4</span></li>
+<li><b>Comp</b>: every take of every line with its scores, hear any of them, pick, and build the finished comp.</li>
 <li><b>Tighten</b>: line up doubles, ad-libs, backing vocals and guitars with the lead. <span class="soon">M5</span></li>
 <li><b>Review</b>: scores for the whole song, the lines to check, and the Style that decides what matters most.</li>
-<li><b>Export</b>: make the finished audio files, or drag them straight into your DAW. <span class="soon">M4</span></li>
+<li><b>Export</b>: every finished layer as audio files. <span class="soon">M5</span> (the comp itself is built and
+dragged out on the Comp page).</li>
 </ul>
 
 <h2>Getting lyrics in</h2>
@@ -171,8 +173,37 @@ to let Comp Captain choose. <b>&#x2191; &#x2193;</b> (or Swap Take) step through
 <li><b>Line Scores</b> (right) shows the ticked take's scores and why: what's good, what could be better, and any
 &#x26A0; problem.</li>
 <li><b>AUTO COMP</b> clears your picks: Comp Captain's best take on every line.</li>
-<li>The <b>Best Comp</b> lane shows which take each line uses, along the song. Hearing it and making it into one
-finished performance comes next (M4).</li>
+<li>The <b>Best Comp</b> lane shows which take each line uses, along the song.</li>
+<li><b>Picky-ness</b> (right, under the scores): <b>Best every line</b> uses the top take of each line. Towards
+<b>Fewer cuts</b>, when two takes of a line are close, the comp keeps the take that's already going, so it sounds
+more like one performance with fewer joins. Line Scores says when it did that. Your own picks always stay.</li>
+</ul>
+
+<h2>Hearing takes and the comp</h2>
+<ul>
+<li><b>&#x25B6; on a take</b> plays that take of the line, straight from Comp Captain (with Cubase stopped). Press
+it again (&#x25A0;) to stop. Great for quick A/B: click through the takes of a line.</li>
+<li><b>&#x25B6; at the top</b> plays the comp from the line on screen; the lyric follows along. <b>&#x25B6;</b> on the
+Best Comp lane plays it from the start. <b>&#x25A0;</b> stops.</li>
+<li><b>A/B</b>: while Cubase plays, Comp Captain plays the comp in place of your track, in time with the beat. Press
+A/B again to hear your track as it is. The <b>headphones</b> do the same with the take of the line on screen.</li>
+<li>While Cubase records, Comp Captain never plays over you: you always hear yourself.</li>
+<li>When you close the window, Comp Captain goes back to passing your track through untouched.</li>
+<li>If nothing plays with Cubase stopped, turn on the track's <b>monitor</b> button (the speaker), or press Play in
+Cubase and use A/B.</li>
+</ul>
+
+<h2>Build Performance (the finished comp)</h2>
+<ul>
+<li><b>BUILD PERFORMANCE</b> (the gold button on the Comp page) joins the comp's lines into one WAV file, e.g.
+"Lead Comp - Verse 1 (bar 9).wav", in your takes folder.</li>
+<li>Joins go in the quiet gap between two lines (a breath), with a short crossfade, so there are no clicks. Where
+two lines run into each other, the crossfade is a little longer.</li>
+<li>Each take is level-matched to your other takes (volume only, at most 6 dB, never into clipping), so a louder
+take doesn't jump out. Your song's own soft and loud lines stay as you sang them.</li>
+<li>The file starts on a bar line: the name says which. <b>Drag to DAW</b> (hold the mouse down and drag) puts it
+on a track: drop it at that bar (with Snap on, it lands exactly). The folder button shows the file.</li>
+<li>Building again makes a new file ("... 2.wav"): one your DAW is already using is never changed.</li>
 </ul>
 
 <h2>Review and Style</h2>

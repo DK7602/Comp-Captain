@@ -1,10 +1,12 @@
 COMP CAPTAIN - HOW TO INSTALL
 =============================
 
-This version is M3 (0.4.2): takes, lyrics and scores. Record takes with CAPTURE, add audio files, or bring in the takes
-on a Cubase track's lanes (ARA). Every take lands on its bar. Give it your lyrics and it listens to your takes and
-lines every line up, so the teleprompter follows your song. Scores and comping come next; those parts still show a
-sample song (marked SAMPLE). On your track it passes your audio through untouched.
+This version is M4 (0.5.0): takes, lyrics, scores and the comp. Record takes with CAPTURE, add audio files, or bring
+in the takes on a Cubase track's lanes (ARA). Every take lands on its bar. Give it your lyrics and it listens to your
+takes and lines every line up, so the teleprompter follows your song. Every line of every take gets scores; hear any
+take from Comp Captain, pick, and Build Performance joins the best lines into one take you drag into Cubase.
+Tightening and the Export page come next (they still show a sample song, marked SAMPLE). On your track it passes your
+audio through untouched (unless you ask it to play a take or the comp).
 
 The "Comp Captain.vst3" folder is bigger now (about 60 MB): it carries the speech model that listens to your takes,
 on your computer (nothing is sent anywhere). Copy the whole folder, as before.
@@ -28,18 +30,21 @@ MAC
 LINUX
 Copy "Comp Captain.vst3" into  ~/.vst3
 
-TRY M3 IN CUBASE (the test for this version)
-1. Put Comp Captain on your lead vocal track (insert). Turn on the track's Monitor button (the speaker).
-2. Lyrics page: paste the lyrics of the part you'll sing, with [Verse 1] and so on above it.
-3. Record page: arm the red button and record 5 or more takes of the same part (a loop in Cubase is easiest).
-4. Wait until the Lyrics page has listened to every take ("5 of 5 vocal takes listened to"), then a moment more.
-5. Comp page, Line view: every take of the current line, with Pitch, Timing, Clarity, Energy and a total. The
-   ticked take is Comp Captain's pick. Use the arrows by the lyric to go through the lines.
-6. For each line, decide which take YOU would use, and click it. Do the reasons on the right make sense?
-   Does a warning (triangle) really have the problem it names (a pop, clipping, a loud breath)?
-7. Review page: the Assistant says how often your picks match Comp Captain's ("on 7 of 9 lines").
-   Send that, and anything that looked wrong.
-8. Try a Style (Review page, right): Rap doesn't count pitch; Worship / Gospel counts it most.
+TRY M4 IN CUBASE (the test for this version)
+Use your project with the takes you already recorded (Comp Captain on the track, lyrics in, takes listened to).
+1. Comp page, Line view. Press the play button (triangle) next to a take: you hear that take of the line, straight
+   from Comp Captain, with Cubase stopped. Try a few takes of a line. (If nothing plays, turn on the track's
+   Monitor button, the speaker.)
+2. Pick the takes you want, like last time (click a take). Try the Picky-ness slider (right): towards Fewer cuts
+   the comp keeps one take going when two are close.
+3. Press the big play button at the top: the comp plays from the line on screen and the lyric follows along.
+   Listen to the joins between lines: any clicks, jumps in volume, or cut-off words?
+4. Press Play in Cubase, then A/B: you hear the comp in time with your beat, in place of your track. Press A/B
+   again to hear your track as it is.
+5. Press BUILD PERFORMANCE (gold button). When the Assistant says the file is ready, hold the mouse down on
+   "Drag to DAW" and drag it onto a new audio track in Cubase, at the bar it says (with Snap on).
+6. Play it in Cubase (mute the original track): does it sound like one performance, in time with the beat?
+   Send what you heard, especially any join that doesn't sound right (which line).
 
 TIPS
 - Click the logo to switch between the light and dark look.
@@ -48,3 +53,5 @@ TIPS
 - Click the red button again when you're done, so it doesn't capture while you record other tracks.
 - Drag the window's corner to make it bigger or smaller, or use the gear (settings) button.
 - The ? button opens the manual.
+- If dragging into Cubase doesn't work, click the folder button next to "Drag to DAW": it shows the file, and you can
+  drag it from there (or use File > Import > Audio File in Cubase).

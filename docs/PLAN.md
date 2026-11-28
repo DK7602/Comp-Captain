@@ -358,6 +358,40 @@ small sample). Asked which line differed and why, for tuning.
 Auto Comp, the comp view, auditioning, swapping, joins and crossfades, level match, undo, saving with the project,
 drag to DAW. Pass: a comped verse with no clicks or jumps at the joins.
 
+**Owner's M3 retest (2026-11-28):** redone after the pick mix-up: "your pick matches on 4 of 4 lines". M3 passed.
+
+**M4 status (0.5.0, 2026-11-28): built, waiting for the owner's Cubase test.**
+- **Engine `Comp`**: lines in a row from one take play as one piece. A join between takes goes in the quietest spot
+  between the end of one take's line and the start of the other's next line (both takes' loudness every 10 ms, the
+  louder of the two, nearer the middle on a tie; a little either side when the lines overlap), with an equal-power
+  crossfade of 15 ms where it's quiet, 40 ms where someone's singing. The comp starts 0.35 s before the first line
+  (the breath in) and ends at the first quiet spot after the last line (0.8 s at most). Takes that don't overlap in
+  time (punch-ins) fade on their own. Level match: each take's loudness against the other takes on the same lines
+  (median of the differences), evened out per piece (at most 6 dB, never into clipping), so the song's soft and loud
+  lines stay as sung (a first version compared pieces with each other and would have flattened them). Render mixes
+  the pieces from the WAVs at any rate (resampled), mono or stereo. `barStartBefore` for the file's first bar.
+- **Engine `Player`**: a finished clip handed to the audio thread with an atomic pointer and a generation count;
+  the message thread frees an old clip once the audio thread has started a block after it was replaced, or isn't
+  in a block (seq_cst both ways). Free clips play while the DAW is stopped and stop at the end or when it starts;
+  in-time clips replace the track at the song position while it plays, never while recording.
+- **Plug-in**: the window sends the comp (`comp`: line -> take, and how picky, saved as `picky=`); `hear` (a take's
+  line, the comp from a line, or either in time), `hearStop`, `build`, `dragOut`, `reveal`; sends `audition` and
+  `built`. Sounds are rendered on the files thread at the host rate. Hearing stops when the window closes. If no
+  blocks come while a free clip waits, the window says to turn the track's monitor on or use A/B while playing.
+  As a VST3 the tail is endless (Cubase may stop calling a plug-in on a quiet track otherwise). Build Performance
+  writes "<Role> Comp - <Section>[ to <Section>] (bar N).wav" in the takes folder, starting on the bar line before
+  the comp, at the takes' rate; never overwrites (" 2").
+- **Interface**: Fewer cuts / Best every line works out the comp (Viterbi: total + 0.5 for a favourite, a change of
+  take between lines less than 2 s apart costs (1 - picky) x 10 points; at Best every line it's the per-line best),
+  play / stop on each take, Play (the comp from the line on screen), A/B and headphones (in time), Build
+  Performance, Your comp with Drag to DAW and Show the file; a double-click picks once.
+- **Tests**: CompTests, PlayerTests, `CompCaptainCompTest` (links the plug-in's shared code + JUCE's ARA client
+  file; records the speech sample twice through CAPTURE paced at 4x real time, then builds, hears, A/B), host test
+  (endless tail), interface test (90 checks). `cc_comp` on the Don vocal with a late quieter copy and an early
+  louder one, a join at every line: no clicks.
+- Not yet: the Song view doesn't light the chosen piece on each take's lane; word swap; the Export page (with
+  Tighten, M5); ARA takes aren't listened to, so they can't be comped yet; dragging out on the Mac is untested.
+
 ### M5 - Tighten
 Doubles, harmonies, backing, ad-libs and guitars lined up, the Tightness knob, before / after, rendering.
 Pass: a 4-layer stack sounds like one tight performance with no warble or chopped words.

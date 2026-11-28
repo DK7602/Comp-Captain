@@ -4,13 +4,16 @@
 the best performance out of the best lines, and lines up your doubles, stacks, ad-libs and doubled guitars so they
 sit tight with the lead.
 
-Status: **M3, takes, lyrics and scores (0.4.2).** CAPTURE records every pass through the track as a take stamped with its
+Status: **M4, takes, lyrics, scores and the comp (0.5.0).** CAPTURE records every pass through the track as a take stamped with its
 bar; audio files (WAV, AIFF, FLAC, MP3) can be dropped in; as a Cubase Extension (ARA) it lists and plays the takes on
 a track's lanes. Lyrics (pasted, .txt / .lrc / .docx, or written by Hear It) are shared by every copy in the project;
 each vocal take is listened to in the background (whisper.cpp, on the computer) and every line is lined up with the
 takes, so the teleprompter follows the song. Every line of every take gets Pitch, Timing, Clarity and Energy scores
 with plain reasons and a warning for recording problems; you pick takes per line, and a Style weighs the scores.
-Building the finished comp comes next (M4). On a track it passes audio through untouched. The plan is in [docs/PLAN.md](docs/PLAN.md).
+Any take of any line, or the comp, plays from the plug-in (with the DAW stopped, or in time while it plays, A/B);
+Build Performance joins the lines in the breaths with short crossfades and level matching into one WAV on its bar,
+dragged straight into the DAW. Tightening comes next (M5). On a track it passes audio through untouched unless
+you ask it to play. The plan is in [docs/PLAN.md](docs/PLAN.md).
 
 ## Getting a build
 
@@ -25,7 +28,7 @@ download **Comp Captain - Windows** (or your system), and follow `INSTALL.txt` i
 | `engine/` | Framework-free C++20: every decision, tested without a DAW. |
 | `tests/` | Catch2 tests for the engine and the interface files. |
 | `plugin/` | The thin JUCE 8 wrapper (VST3, Standalone, AU on Mac). |
-| `host-test/` | Loads the built VST3 like a DAW (scan, play, CAPTURE a take, save, restore, open the window), tests ARA with a pretend DAW, and tests adding audio files. |
+| `host-test/` | Loads the built VST3 like a DAW (scan, play, CAPTURE a take, save, restore, open the window), tests ARA with a pretend DAW, tests adding audio files, and (comp test) builds and plays the comp with the plug-in's own code. |
 | `tests/ui/` | Checks the window's messages to and from the plug-in in a real browser (Playwright). |
 | `art/` | The owner's original art and mockups. |
 
@@ -44,7 +47,8 @@ Speech recognition (whisper.cpp) is built in by default (`-DCC_WITH_SPEECH=OFF` 
 into the plug-in and run the speech tests, download `ggml-base.en-q5_1.bin` (see the workflow for the address and its
 fingerprint) and add `-DCC_WHISPER_MODEL=<path to it>`. `cc_listen <model> <take.wav> [lyrics.txt]` prints what it
 hears in a take and where each lyric line lands; `cc_score <model> <lyrics.txt> <take1.wav> <take2.wav> ...` prints
-every line's scores for every take, with the reasons.
+every line's scores for every take, with the reasons; `cc_comp <model> <lyrics.txt> <out.wav> <take1.wav> ...
+[--alternate]` joins the best lines into one performance and checks every join for clicks.
 
 Handy for testing: `COMP_CAPTAIN_TAKES_FOLDER=<folder>` saves takes there instead of Documents/Comp Captain,
 `COMP_CAPTAIN_SPEECH_MODEL=<file>` points the plug-in at a speech model, and `CC_TEST_AUDIO=<folder>` makes
