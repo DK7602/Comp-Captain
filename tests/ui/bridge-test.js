@@ -314,6 +314,74 @@ const { chromium } = require('playwright');
   out = await sent();
   check(out.some((m) => m.type === 'picksSet' && Object.keys(m.picks).length === 0), 'Auto Comp lets Comp Captain pick every line');
 
+  // ---------------------------------------------------------------- M4: the comp
+  await send({ type: 'scores', ready: true, any: true, style: 'Singing', weights: [0.35, 0.25, 0.2, 0.2], picks: {}, picky: 1,
+    lines: [{ line: 0, takes: [sc('t1', 90, 90, 90, 90), sc('t2', 92, 92, 92, 92)] }, { line: 1, takes: [sc('t1', 95, 95, 95, 95), sc('t2', 80, 80, 80, 80)] }] });
+  await p.waitForTimeout(400);
+  out = await sent();
+  let comp = out.filter((m) => m.type === 'comp').pop();
+  check(comp && comp.picky === 1 && comp.lines.map((l) => l.line + ':' + l.id).join() === '0:t2,1:t1', 'the comp goes to the plug-in: the best take of every line (' + JSON.stringify(comp) + ')');
+  await p.click('#section-chips .chip:first-child');
+  await p.click('#picky', { position: { x: 1, y: 6 } });
+  await p.waitForTimeout(400);
+  out = await sent();
+  comp = out.filter((m) => m.type === 'comp').pop();
+  check(comp && comp.picky < 0.05 && comp.lines.map((l) => l.line + ':' + l.id).join() === '0:t1,1:t1', 'towards Fewer cuts, a take nearly as good carries on (' + JSON.stringify(comp) + ')');
+  check((await p.textContent('#sc-best')).includes('keeps Take 1 going'), 'Line Scores says why the comp keeps that take');
+  check((await p.$eval('#take-rows .take-row:nth-child(1)', (e) => e.classList.contains('chosen'))), 'and that take is ticked');
+
+  await p.click('#take-rows .take-row:nth-child(2) .sq');
+  out = await sent();
+  check(out.some((m) => m.type === 'hear' && m.what === 'take' && m.id === 't2' && m.line === 0), 'the play button on a take hears that take of the line');
+  await send({ type: 'audition', what: 'take', id: 't2', line: 0, inTime: false, preparing: false, sounding: true, seconds: 21.5, problem: '', building: false });
+  await p.waitForTimeout(100);
+  check(await p.$eval('#take-rows .take-row:nth-child(2) .sq', (e) => e.classList.contains('on')), 'the take playing shows a stop button');
+  await p.click('#take-rows .take-row:nth-child(2) .sq');
+  out = await sent();
+  check(out.some((m) => m.type === 'hearStop'), 'pressing it again stops');
+  await send({ type: 'audition', what: '', id: '', line: -1, inTime: false, preparing: false, sounding: false, seconds: 0, problem: '', building: false });
+
+  await p.click('#t-play');
+  out = await sent();
+  check(out.some((m) => m.type === 'hear' && m.what === 'comp' && m.line === 0), 'Play hears the comp from the line on screen');
+  await p.click('#t-ab');
+  out = await sent();
+  check(out.some((m) => m.type === 'hear' && m.what === 'comp' && m.inTime === true), 'A/B swaps the track for the comp while the DAW plays');
+  await send({ type: 'audition', what: '', id: '', line: -1, inTime: false, preparing: false, sounding: false, seconds: 0,
+    problem: 'Cubase isn\u2019t running Comp Captain while it\u2019s stopped.', building: false });
+  await p.waitForTimeout(100);
+  check((await p.textContent('#toast')).includes('isn\u2019t running Comp Captain'), 'a reason it can\'t play is shown');
+
+  // a double-click on a take picks it once
+  await sent();
+  await p.dblclick('#take-rows .take-row:nth-child(2) .name');
+  out = await sent();
+  check(out.filter((m) => m.type === 'pick').length === 1 && out.find((m) => m.type === 'pick').id === 't2', 'a double-click picks the take once (it isn\'t undone)');
+
+  // Build Performance, then drag the file into the DAW
+  await p.click('#go-btn');
+  out = await sent();
+  check(out.some((m) => m.type === 'build'), 'Build Performance asks the plug-in to build the comp');
+  check((await p.textContent('#msg-title')).includes('Building your comp'), 'the Assistant says it\'s building');
+  const compFile = 'C:/Users/me/Documents/Comp Captain/x/Lead Comp - Verse 1 (bar 9).wav';
+  await send({ type: 'built', building: false, ok: true, file: compFile, name: 'Lead Comp - Verse 1 (bar 9).wav', bar: 9, message: 'Lead Comp - Verse 1 (bar 9).wav is ready: drag it into your DAW at bar 9.' });
+  await p.waitForTimeout(100);
+  check((await p.textContent('#msg-title')).includes('is ready') && (await p.textContent('#msg-ticks')).includes('bar 9'), 'the Assistant says the comp is ready, and where to drop it');
+  const chip = await p.$('#opt-box .drag-chip');
+  check(!!chip, 'a Drag to DAW handle appears');
+  if (chip) {
+    const box = await chip.boundingBox();
+    await p.mouse.move(box.x + 10, box.y + 10);
+    await p.mouse.down();
+    await p.mouse.move(box.x + 40, box.y - 30, { steps: 4 });
+    await p.mouse.up();
+    out = await sent();
+    check(out.some((m) => m.type === 'dragOut' && m.file === compFile), 'dragging it hands the file to the DAW');
+  }
+  await p.click('#opt-box .show-file');
+  out = await sent();
+  check(out.some((m) => m.type === 'reveal' && m.file === compFile), 'Show the file opens its folder');
+
   check(errors.length === 0, 'no script errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
   await b.close();
 })();

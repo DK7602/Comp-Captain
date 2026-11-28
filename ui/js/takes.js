@@ -482,6 +482,9 @@ const Takes = (() => {
   const AUDIO = /\.(wav|wave|aif|aiff|aifc|flac|mp3)$/i;
   const LYRICS = /\.(txt|text|lrc|docx|doc|html|htm)$/i;
   let lyricsDrop = null;
+  // The comp being dragged out to the DAW: if it's dropped back on this window, it isn't added as a take.
+  let draggedOut = { name: '', at: 0 };
+  const noteDragOut = (name) => { draggedOut = { name, at: Date.now() }; };
   const setLyricsDrop = (fn) => { lyricsDrop = fn; };
   function wireDrop(stage, hint) {
     let depth = 0;
@@ -493,6 +496,9 @@ const Takes = (() => {
       if (!hasFiles(e)) return;
       e.preventDefault(); depth = 0; hint.hidden = true;
       const files = Array.from(e.dataTransfer.files || []);
+      if (draggedOut.name && Date.now() - draggedOut.at < 120000 && files.some((f) => f.name === draggedOut.name)) {
+        toastFn('That\u2019s your comp: drop it on a track in your DAW.', 4000); return;
+      }
       const audio = files.filter((f) => AUDIO.test(f.name));
       const lyricFile = files.find((f) => LYRICS.test(f.name));
       if (!audio.length && lyricFile && lyricsDrop) { lyricsDrop(lyricFile); return; }
@@ -591,7 +597,7 @@ const Takes = (() => {
   }
 
   return {
-    st, ROLES, roleLabel, roleColor, onChange, setToast, setMenu,
+    st, ROLES, roleLabel, roleColor, onChange, setToast, setMenu, noteDragOut,
     setArmed, setLoopTakes, viewTrack, setTrackRole, openFolder, askReport, addFiles, select, selected,
     renderList, drawRecord, drawLanes, trackMenu, trackLabel, wireDrop, setLyricsDrop, status, playheadPpq, mockStart, fmtLen, hearingNothing,
     drawTakeSpan, shortName, colorOf, envOf,

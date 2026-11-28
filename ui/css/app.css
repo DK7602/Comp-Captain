@@ -721,3 +721,15 @@ svg { display: block; }
 .rv.flag .total { border-color: rgba(255, 176, 32, .8); }
 .rv.none .txt { color: var(--text-3); }
 .rv .tg.mine { outline: 2px solid #ffd04a; outline-offset: 1px; }
+
+/* M4: the comp file, dragged out to the DAW */
+.drag-chip { display: flex; align-items: center; gap: 10px; margin: 6px 0 6px; padding: 9px 14px; border-radius: 10px;
+  border: 1.5px solid transparent; background: var(--gold-fill) padding-box, var(--gold-edge) border-box; box-shadow: var(--gold-glow);
+  color: var(--gold-text); font-weight: 700; font-size: 17px; cursor: grab; user-select: none; touch-action: none; }
+.drag-chip svg { width: 20px; height: 20px; }
+.drag-chip:active { cursor: grabbing; }
+#stage[data-theme="light"] .drag-chip { color: #6b4500; }
+.built-row { display: flex; align-items: center; gap: 8px; }
+.built-row .drag-chip { flex: 1; margin: 6px 0 2px; }
+.built-row .show-file { width: 42px; height: 40px; flex: none; }
+.built-name { font-size: 13px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

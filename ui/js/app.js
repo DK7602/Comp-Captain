@@ -16,7 +16,11 @@
   const T = Takes, TS = Takes.st;
   const SG = Song, SS = Song.st;
   const SCR = Scores, SCS = Scores.st;
-  const realScores = () => Bridge.inHost;  // inside the plug-in the scores are real (M3); a browser shows the sample song
+  const realScores = () => Bridge.inHost;
+  // What's being heard from Comp Captain (M4): a take, the comp, or nothing (the track as it is).
+  const AUD = { what: '', id: '', line: -1, inTime: false, preparing: false, sounding: false, seconds: 0, problem: '', building: false, at: 0 };
+  // The comp file Build Performance made.
+  const BUILT = { building: false, ok: false, file: '', name: '', bar: 0, message: '' };  // inside the plug-in the scores are real (M3); a browser shows the sample song
   if (Bridge.inHost) stage.dataset.host = '1';
   const real = () => TS.real;
   if (real()) stage.dataset.real = '1';
@@ -179,6 +183,7 @@
   // messages), the sample song's clock in a browser. -1 when the DAW hasn't said.
   function songTime() {
     if (!Bridge.inHost) return S.time;
+    if (AUD.sounding && !AUD.inTime) return AUD.seconds + (performance.now() - AUD.at) / 1000;
     const t = TS.transport;
     if (!t.known) return -1;
     return (+t.seconds || 0) + (t.playing ? (performance.now() - t.at) / 1000 : 0);
@@ -408,17 +413,29 @@
       const r = h('div', 'take-row' + (sc.id === chosen ? ' chosen' : '') + (sc.id === mine ? ' mine' : ''));
       const warn = (sc.problems || []).join('\n');
       r.title = sc.id === mine ? 'Your pick for this line (click again to let Comp Captain choose)' : (sc.id === best ? 'Comp Captain\u2019s best take for this line' : 'Click to pick this take for the line');
-      r.innerHTML = `<span class="check">\u2713</span><button class="sq" title="Hear this take (arrives in M4)">${icon('i-play')}</button>
+      const hearing = AUD.what === 'take' && AUD.id === sc.id && AUD.line === li && !AUD.inTime;
+      r.innerHTML = `<span class="check">\u2713</span><button class="sq${hearing ? ' on' : ''}" title="${hearing ? 'Stop' : 'Hear this take of the line'}">${icon(hearing ? 'i-stop' : 'i-play')}</button>
         <span class="name">${escapeHtml(tk ? tk.name : sc.id)}</span>${tk && tk.fav ? '<span class="fav" title="Favourite">\u2665</span>' : ''}<canvas></canvas>
         <span class="warn-badge" title="${escapeHtml(warn)}">${warn ? '\u26A0' : ''}</span>
         <div class="scores">${scoreCellReal(sc.p)}${scoreCellReal(sc.t)}${scoreCellReal(sc.c)}${scoreCellReal(sc.e, 'e')}<div class="total">${Math.round(SCR.total(sc))}%</div></div>`;
       r.onclick = (e) => {
-        if (e.target.closest('.sq')) return toast('Hearing a take on its own arrives in M4 (Comp). For now, play it in your DAW.');
+        if (e.target.closest('.sq')) { hearTake(sc.id, li); return; }
+        // a double-click picks once (the second click would let Comp Captain choose again)
+        const now = performance.now();
+        if (lastRowClick.id === sc.id && lastRowClick.li === li && now - lastRowClick.at < 450) return;
+        lastRowClick = { id: sc.id, li, at: now };
         pickTake(li, sc.id === mine ? null : sc.id);
       };
       rows.appendChild(r);
       if (q0 >= 0) T.drawTakeSpan($('canvas', r), sc.id, q0, q1);
     });
+  }
+  let lastRowClick = { id: '', li: -1, at: 0 };
+  // One take of one line, from Comp Captain (click again to stop).
+  function hearTake(id, li) {
+    if (AUD.what === 'take' && AUD.id === id && AUD.line === li && !AUD.inTime) { Bridge.send('hearStop', {}); return; }
+    Bridge.send('hear', { what: 'take', id, line: li });
+    if (TS.transport.playing) toast(`Cubase is playing: ${takeName(id)} plays in place of your track, in time. Press \u25A0 to go back.`, 4500);
   }
   // Your pick for a line (null: let Comp Captain choose), with undo.
   function pickTake(li, id) {
@@ -460,7 +477,8 @@
   // Line Scores (right panel): the chosen take's four scores and total, and why.
   function renderScorePanelReal() {
     const li = S.sl, id = SCR.chosen(li), sc = id ? SCR.scoreOf(li, id) : null, best = SCR.best(li), mine = SCR.pickOf(li);
-    $('#sc-best').textContent = !sc ? '' : mine ? (mine === best ? `(Your pick: ${takeName(mine)}, also the best)` : `(Your pick: ${takeName(mine)} \u00B7 best: ${takeName(best)})`) : `(Best: ${takeName(id)})`;
+    $('#sc-best').textContent = !sc ? '' : mine ? (mine === best ? `(Your pick: ${takeName(mine)}, also the best)` : `(Your pick: ${takeName(mine)} \u00B7 best: ${takeName(best)})`)
+      : id !== best ? `(The comp keeps ${takeName(id)} going: fewer cuts \u00B7 best: ${takeName(best)})` : `(Best: ${takeName(id)})`;
     const box = $('#score-sliders'); box.innerHTML = '';
     const rows = [['i-fork', 'Pitch', sc && sc.p], ['i-clock', 'Timing', sc && sc.t], ['i-gem', 'Clarity', sc && sc.c], ['i-bolt', 'Energy', sc && sc.e], ['i-star', 'Total (Line)', sc ? Math.round(SCR.total(sc)) : null, 'tot']];
     rows.forEach(([ic, name, v, cls]) => {
@@ -924,8 +942,11 @@
     const add = (ic, label, fn) => { const b = h('button', 'send-btn', `${icon(ic)}${label}${icon('i-ext').replace('<svg', '<svg class="ext"')}`); b.onclick = fn; col.appendChild(b); };
     const suite = [['voxology', 'Send to Voxology', 'i-wave'], ['mixology', 'Send to Mixology', 'i-sliders']].filter(([k]) => S.sonicology[k] !== 'missing');
     suite.forEach(([k, label, ic]) => add(ic, label, () => sendTo(k)));
-    if (suite.length < 2) add('i-drag', 'Drag to DAW', () => setPage('export', true));
-    if (suite.length < 1) add('i-export', 'Render All', () => soon('Rendering', 'M4'));
+    if (suite.length < 2) {
+      if (Bridge.inHost && BUILT.ok && BUILT.file) { add('i-drag', 'Drag to DAW', () => {}); dragSource(col.lastChild); }
+      else add('i-drag', 'Drag to DAW', () => (Bridge.inHost ? toast('Build Performance (Comp page) first: then drag your comp into your DAW from here.', 5000) : setPage('export', true)));
+    }
+    if (suite.length < 1) add('i-export', 'Render All', () => (Bridge.inHost ? toast('The comp is made on the Comp page with Build Performance. Rendering every layer comes with Tighten (M5).', 6000) : soon('Rendering', 'M5')));
   }
   function sendTo(k) {
     const name = k === 'voxology' ? 'Voxology' : 'Mixology';
@@ -957,7 +978,8 @@
       if (!a.picked) return [title, ['Pick your takes on the Comp page', 'Then this compares your picks', `Style: ${SCS.style}`]];
       return [title, [`Style: ${SCS.style}`, 'Hearts win ties', 'Click a line to comp it']];
     }
-    return [`${scored} of ${n} lines scored across ${takes.size} take${takes.size === 1 ? '' : 's'}`, ['Click a take to pick it for the line', '\u2191 \u2193 step through the takes', `Style: ${SCS.style}`]];
+    const j = SCR.joins();
+    return [`${scored} of ${n} lines scored across ${takes.size} take${takes.size === 1 ? '' : 's'}`, ['\u25B6 hears a take', 'Click a take to pick it', `The comp: ${j} join${j === 1 ? '' : 's'}`]];
   }
   function renderFooter() {
     const p = S.page;
@@ -992,7 +1014,7 @@
     } else {
       const opts = {
         lyrics: ['Tips', 'i-bulb', ['Put [Verse 1] above a part to make a section', 'Type [Chorus] again to sing it again', 'No lyrics? Hear It writes them for you']],
-        comp: realScores() ? ['Picking takes', 'i-target', ['Click a take to pick it for this line', 'Click your pick again: Comp Captain chooses', 'AUTO COMP: the best take for every line']] : ['Comp Builder', 'i-target', ['Build from the highest-scoring takes', 'Keep the strongest feel & performance', 'Blend joins in the breaths (no clicks)']],
+        comp: realScores() ? ['Picking takes', 'i-target', ['\u25B6 on a take: hear that line', 'Click a take to pick it (again: Comp Captain chooses)', 'BUILD PERFORMANCE: the comp as one take']] : ['Comp Builder', 'i-target', ['Build from the highest-scoring takes', 'Keep the strongest feel & performance', 'Blend joins in the breaths (no clicks)']],
         tighten: ['Suggestions (Optional)', 'i-bulb', ['Tighten doubles (\u221212 ms)', 'Match backing vocal level (+1.5 dB)', 'Line up Guitar Layer 2 with the grid']],
         review: ['What the scores mean', 'i-bulb', ['Pitch: on the notes \u00B7 Timing: on the beat', 'Clarity: words clear \u00B7 Energy: delivery', '\u26A0 a pop, clip or loud breath was heard']],
         export: ['Each file carries its role', 'i-bulb', ['Lead, Double, Ad-lib, Backing, Guitar', 'Voxology reads the role automatically', 'Plain WAV: opens in any DAW']],
@@ -1001,12 +1023,58 @@
       ob.appendChild(h('div', 'opt-title', `${icon(opts[1])}${opts[0]}`));
       opts[2].forEach((t) => ob.appendChild(h('div', 'opt', checks ? `<span class="check on">\u2713</span>${t}` : `<span class="gold">\u2022</span>${t}`)));
     }
+    if (p === 'comp' && realScores()) renderBuiltBox();
     sendButtons();
     const go = { lyrics: 'Line Up<br>Lyrics', comp: 'Build<br>Performance', tighten: 'Apply &amp;<br>Render', review: 'Re-score<br>All Takes', export: 'Render<br>All' }[p];
     if (go) $('#go-label').innerHTML = go;
   }
+  // The comp file Build Performance made: drag it into the DAW (or show it in its folder).
+  function renderBuiltBox() {
+    if (BUILT.building) {
+      $('#msg-title').textContent = 'Building your comp\u2026';
+      const ticks = $('#msg-ticks'); ticks.innerHTML = '';
+      ['Joins in the gaps', 'Levels matched', 'Starts on a bar line'].forEach((t) => ticks.appendChild(h('span', '', t)));
+      return;
+    }
+    if (!BUILT.ok || !BUILT.file) return;
+    $('#msg-title').textContent = `${BUILT.name} is ready`;
+    const ticks = $('#msg-ticks'); ticks.innerHTML = '';
+    [`Drop it at bar ${BUILT.bar}`, 'Joins in the gaps', 'Levels matched'].forEach((t) => ticks.appendChild(h('span', '', t)));
+    const ob = $('#opt-box'); ob.innerHTML = '';
+    ob.appendChild(h('div', 'opt-title', `${icon('i-export')}Your comp`));
+    const row = h('div', 'built-row');
+    const chip = h('div', 'drag-chip', `${icon('i-drag')}<span>Drag to DAW</span>`);
+    dragSource(chip);
+    row.appendChild(chip);
+    const show = h('button', 'sq show-file', icon('i-folder'));
+    show.title = 'Show the file in its folder';
+    show.onclick = () => Bridge.send('reveal', { file: BUILT.file });
+    row.appendChild(show);
+    ob.appendChild(row);
+    ob.appendChild(h('div', 'built-name', escapeHtml(BUILT.name)));
+  }
+  // Holding the mouse down on it and moving drags the comp file out to the DAW (the plug-in starts the drag).
+  function dragSource(el) {
+    el.title = `Hold and drag onto a track in your DAW, at bar ${BUILT.bar}`;
+    let down = null;
+    el.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY }; });
+    el.addEventListener('pointermove', (e) => {
+      if (!down || !(e.buttons & 1)) return;
+      if (Math.abs(e.clientX - down.x) + Math.abs(e.clientY - down.y) < 4) return;
+      down = null;
+      T.noteDragOut(BUILT.name);
+      Bridge.send('dragOut', { file: BUILT.file });
+    });
+    el.addEventListener('pointerup', () => { if (down) toast(`Hold the button down and drag it onto a track in your DAW, at bar ${BUILT.bar}.`, 4500); down = null; });
+  }
   function goAction() {
-    if (S.page === 'comp' && realScores()) return toast('Building the finished comp (one performance from your picks) arrives in M4. Your picks are saved with the project.', 5000);
+    if (S.page === 'comp' && realScores()) {
+      if (BUILT.building) return toast('Still building your comp\u2026');
+      if (!SCS.any || !Object.keys(SCR.compOf()).length) return toast('Once your takes are scored, Build Performance joins the best lines into one take.', 5000);
+      S.buildAsked = true; BUILT.building = true; Bridge.send('build', {}); renderFooter();
+      return;
+    }
+    if (S.page === 'export' && Bridge.inHost) return toast('The comp is made on the Comp page: Build Performance, then drag it into your DAW. Rendering every layer comes with Tighten (M5).', 6000);
     if (S.page === 'review' && realScores()) return toast('Scores are worked out again by themselves whenever your takes or lyrics change.', 4000);
     if (S.page === 'comp') { setChoice(autoComp(), 'Best performance built from the highest-scoring lines.'); return; }
     if (S.page === 'lyrics' && Bridge.inHost) {
@@ -1033,14 +1101,23 @@
 
   // ------------------------------------------------------------------ playback (demo: moves the playheads only)
   let raf = 0, lastT = 0, lastRec = 0;
+  // Inside the plug-in: Play hears the comp from the line on screen (Cubase stopped); press again to stop.
+  function hostPlay(fromStart) {
+    if (AUD.what && !AUD.inTime) { Bridge.send('hearStop', {}); return; }
+    if (TS.transport.playing) { toast('Cubase is playing: press A/B to hear the comp in place of your track, or stop Cubase to play it from here.', 5000); return; }
+    if (!SS.lines.length || !SCS.any) { toast('Once your takes are scored, Play hears the comp from here.', 4000); return; }
+    Bridge.send('hear', { what: 'comp', line: fromStart ? -1 : S.sl });
+  }
   function play(force) {
-    if (Bridge.inHost) { toast('Use your DAW\u2019s Play: Comp Captain follows it. (Hearing takes from here arrives in M4.)', 4000); return; }
+    if (Bridge.inHost) { hostPlay(false); return; }
     S.playing = force === true ? true : !S.playing;
     $('#t-play').innerHTML = icon(S.playing ? 'i-pause' : 'i-play');
     if (S.playing) { lastT = performance.now(); raf = requestAnimationFrame(tick); } else cancelAnimationFrame(raf);
     renderRecord(); renderFooter();
   }
-  function stop() { S.playing = false; cancelAnimationFrame(raf); $('#t-play').innerHTML = icon('i-play'); renderRecord(); renderFooter(); }
+  function stop() {
+    if (Bridge.inHost) { if (AUD.what) Bridge.send('hearStop', {}); return; }
+    S.playing = false; cancelAnimationFrame(raf); $('#t-play').innerHTML = icon('i-play'); renderRecord(); renderFooter(); }
   function tick(now) {
     const dt = Math.min(0.1, (now - lastT) / 1000); lastT = now;
     S.time += dt;
@@ -1168,13 +1245,36 @@
       if (!Bridge.inHost) S.time = t;
       const c = SG.lineAt(t); if (c >= 0) setLine(c, false);
     };
-    $('#t-play').onclick = () => play(); $('#t-stop').onclick = stop; $('#bc-play').onclick = () => play();
+    $('#t-play').onclick = () => play(); $('#t-stop').onclick = stop;
+    $('#bc-play').onclick = () => { if (Bridge.inHost) hostPlay(true); else play(); };
     $('#t-start').onclick = () => { if (!Bridge.inHost) S.time = 0; setLine(0, false); };
     $('#t-loop').onclick = (e) => { S.loop = !S.loop; e.currentTarget.classList.toggle('on', S.loop); toast(S.loop ? 'Looping the current line' : 'Loop off'); };
-    $('#t-ab').onclick = (e) => { e.currentTarget.classList.toggle('on'); toast(e.currentTarget.classList.contains('on') ? 'Hearing: before' : 'Hearing: after'); };
-    $('#t-solo').onclick = (e) => e.currentTarget.classList.toggle('on');
+    $('#t-ab').onclick = (e) => {
+      if (Bridge.inHost) {
+        if (AUD.what === 'comp' && AUD.inTime) { Bridge.send('hearStop', {}); toast('A/B: your track as it is.'); return; }
+        if (!SCS.any) { toast('Once your takes are scored, A/B swaps your track for the comp while Cubase plays.', 4500); return; }
+        Bridge.send('hear', { what: 'comp', inTime: true });
+        toast('A/B: the comp plays in place of your track while Cubase plays. Press A/B again for your track.', 5000);
+        return;
+      }
+      e.currentTarget.classList.toggle('on'); toast(e.currentTarget.classList.contains('on') ? 'Hearing: before' : 'Hearing: after');
+    };
+    $('#t-solo').onclick = (e) => {
+      if (Bridge.inHost) {
+        const id = SCR.chosen(S.sl);
+        if (AUD.what === 'take' && AUD.inTime) { Bridge.send('hearStop', {}); toast('Back to your track.'); return; }
+        if (!id) { toast('No scored take on this line yet.'); return; }
+        Bridge.send('hear', { what: 'take', id, inTime: true });
+        toast(`${takeName(id)} plays in place of your track while Cubase plays. Press again to go back.`, 5000);
+        return;
+      }
+      e.currentTarget.classList.toggle('on');
+    };
     bindSlider($('.topbar .vol'));
-    bindSlider($('#picky'), (v) => toast(v < 0.5 ? 'Fewer cuts: sounds more like one performance' : 'Best every line: picks the top take for each line'));
+    S.pickySet = bindSlider($('#picky'), (v) => {
+      if (realScores()) { SCR.setPicky(v); return; }
+      toast(v < 0.5 ? 'Fewer cuts: sounds more like one performance' : 'Best every line: picks the top take for each line');
+    });
     $('#track-select').onclick = (e) => {
       if (real()) return T.trackMenu(e.currentTarget);
       menu(e.currentTarget, ['Vocal \u2013 Lead', 'Vocal \u2013 Double L', 'Vocal \u2013 Double R', 'Vocal \u2013 Ad-Libs', 'BV \u2013 Stack', 'Guitar \u2013 Rhythm'], (it) => { $('#track-name').textContent = it; $('#track-name').dataset.custom = it; toast('In the plug-in, every track with Comp Captain on it shows here.'); });
@@ -1307,6 +1407,35 @@
     window.addEventListener('resize', fitStage);
   }
 
+  // ------------------------------------------------------------------ hearing and building the comp (M4)
+  let lastProblem = '';
+  Bridge.on('audition', (m) => {
+    const was = AUD.what + AUD.id + AUD.line + AUD.inTime + AUD.sounding;
+    Object.assign(AUD, m, { at: performance.now() });
+    if (m.problem && m.problem !== lastProblem) toast(m.problem, 7000);
+    lastProblem = m.problem || '';
+    renderAudition(was !== AUD.what + AUD.id + AUD.line + AUD.inTime + AUD.sounding);
+  });
+  Bridge.on('built', (m) => {
+    Object.assign(BUILT, m);
+    if (!m.building && S.buildAsked && m.message) { S.buildAsked = false; toast(m.message, 6000); }
+    if (S.page === 'comp') renderFooter();
+  });
+  // The transport's buttons and the take rows show what's playing; the lit line follows the comp as it plays.
+  function renderAudition(changedWhat) {
+    const free = !!AUD.what && !AUD.inTime;
+    $('#t-play').innerHTML = icon(free ? 'i-pause' : 'i-play');
+    $('#bc-play').innerHTML = icon(free && AUD.what === 'comp' ? 'i-pause' : 'i-play');
+    $('#t-ab').classList.toggle('on', AUD.what === 'comp' && AUD.inTime);
+    $('#t-solo').classList.toggle('on', AUD.what === 'take' && AUD.inTime);
+    if (AUD.sounding && !AUD.inTime && AUD.what === 'comp' && SS.lines.some(SG.timed)) {
+      const cur = SG.lineAt(AUD.seconds);
+      if (cur >= 0 && cur !== S.sl) setLine(cur, false);
+    }
+    if (changedWhat && S.page === 'comp') renderLineViewReal();
+    movePlayheads();
+  }
+
   // ------------------------------------------------------------------ messages from the plug-in
   Bridge.on('init', (m) => {
     if (m.version) S.version = m.version;
@@ -1362,6 +1491,7 @@
     requestAnimationFrame(() => {
       scoresQueued = false;
       $('#comp-style-name').textContent = SCS.style;
+      if (S.pickySet) S.pickySet(SCS.picky);
       if (S.page === 'comp') renderComp();
       if (S.page === 'review') renderReview();
       renderFooter();
