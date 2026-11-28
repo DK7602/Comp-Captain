@@ -208,6 +208,11 @@ namespace cc
         return false;
     }
 
+    void WavReader::seek (std::int64_t frame) noexcept
+    {
+        position = std::clamp<std::int64_t> (frame, 0, wav.lengthFrames);
+    }
+
     int WavReader::read (float* const* dest, int numChannels, int numFrames)
     {
         if (! in.is_open() || wav.channels == 0 || numFrames <= 0)

@@ -2,6 +2,7 @@
 add_library(cc_engine STATIC
     src/Align.cpp
     src/Capture.cpp
+    src/Comp.cpp
     src/Features.cpp
     src/LineUp.cpp
     src/Overview.cpp

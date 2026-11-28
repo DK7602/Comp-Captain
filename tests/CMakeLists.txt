@@ -7,6 +7,7 @@ FetchContent_MakeAvailable(Catch2)
 
 add_executable(cc_tests
     CaptureTests.cpp
+    CompTests.cpp
     FeaturesTests.cpp
     LineUpTests.cpp
     LyricsTests.cpp
@@ -46,4 +47,8 @@ if(CC_WITH_SPEECH)
     # cc_score <model> <lyrics.txt> <take1.wav> <take2.wav> ...: every line's scores for every take
     add_executable(cc_score ScoreTool.cpp)
     target_link_libraries(cc_score PRIVATE cc_speech)
+
+    # cc_comp <model> <lyrics.txt> <out.wav> <take1.wav> ... [--alternate]: joins the best lines into one performance
+    add_executable(cc_comp CompTool.cpp)
+    target_link_libraries(cc_comp PRIVATE cc_speech)
 endif()

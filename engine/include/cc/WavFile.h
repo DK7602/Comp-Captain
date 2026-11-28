@@ -69,6 +69,9 @@ namespace cc
         // Reads up to numFrames into dest[channel][frame] (planar floats). Returns frames read (0 at the end).
         int read (float* const* dest, int numChannels, int numFrames);
 
+        // Where the next read starts (frames from the start, clamped to the file).
+        void seek (std::int64_t frame) noexcept;
+
     private:
         std::ifstream in;
         WavInfo wav;
